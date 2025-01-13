@@ -1,1 +1,9 @@
+# npm
 frontend/node_modules
+
+# py cache
+*.pyc
+
+# temporary data
+*.wav
+*.wepm

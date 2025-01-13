@@ -7,47 +7,38 @@ const Simulation = () => {
   const mediaRecorderRef = useRef(null);
   const [isRecording, setIsRecording] = useState(false);
   const chunksRef = useRef([]);
+  const streamRef = useRef(null);
 
   const [interviewText, setInterviewText] = useState('');
   const [answerText, setAnswerText] = useState('');
-  
   useEffect(() => {
+    const videoElement = videoRef.current;
+    let stream = null;
+    let mediaRecorder = null;
+
     const startMedia = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
+        stream = await navigator.mediaDevices.getUserMedia({
           video: true,
           audio: true
         });
         
-        // Настройка видео
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
+        streamRef.current = stream;
+
+        if (videoElement) {
+          videoElement.srcObject = stream;
         }
 
-        // Настройка аудио записи
         const audioTrack = stream.getAudioTracks()[0];
         const audioStream = new MediaStream([audioTrack]);
-        mediaRecorderRef.current = new MediaRecorder(audioStream, {
-          mimeType: 'audio/webm' // или другой поддерживаемый формат
+        
+        mediaRecorder = new MediaRecorder(audioStream, {
+          mimeType: 'audio/webm'
         });
+        mediaRecorderRef.current = mediaRecorder;
 
-        // Обработка записанных чанков
-        mediaRecorderRef.current.ondataavailable = (event) => {
-          if (event.data.size > 0) {
-            chunksRef.current.push(event.data);
-          }
-        };
-
-        // // Когда запись остановлена
-        // mediaRecorderRef.current.onstop = () => {
-        //   const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
-        //   sendAudioToServer(audioBlob);
-        //   chunksRef.current = [];
-        // };
-
-        // // Начинаем запись
-        // mediaRecorderRef.current.start(1000); // Записываем чанками по 1 секунде
-        // setIsRecording(true);
+        mediaRecorder.start();
+        setIsRecording(true);
 
       } catch (err) {
         console.error("Error accessing media devices:", err);
@@ -56,17 +47,115 @@ const Simulation = () => {
 
     startMedia();
 
-    // Очистка при размонтировании
     return () => {
-      if (mediaRecorderRef.current && isRecording) {
-        mediaRecorderRef.current.stop();
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
       }
-      if (videoRef.current && videoRef.current.srcObject) {
-        videoRef.current.srcObject.getTracks().forEach(track => track.stop());
+      if (videoElement) {
+        videoElement.srcObject = null;
       }
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+      }
+      setIsRecording(false);
     };
   }, []);
 
+  const handleFinish = async () => {
+    if (!mediaRecorderRef.current || !isRecording) {
+      return;
+    }
+
+    try {
+      const audioData = await new Promise((resolve) => {
+        const chunks = [];
+        
+        const onDataAvailable = (e) => {
+          if (e.data.size > 0) {
+            chunks.push(e.data);
+          }
+        };
+
+        const onStop = () => {
+          mediaRecorderRef.current.removeEventListener('dataavailable', onDataAvailable);
+          mediaRecorderRef.current.removeEventListener('stop', onStop);
+          const audioBlob = new Blob(chunks, { type: 'audio/webm' });
+          resolve(audioBlob);
+        };
+
+        mediaRecorderRef.current.addEventListener('dataavailable', onDataAvailable);
+        mediaRecorderRef.current.addEventListener('stop', onStop);
+        
+        // Запрашиваем данные и останавливаем запись
+        mediaRecorderRef.current.requestData();
+        mediaRecorderRef.current.stop();
+      });
+
+      // Отправляем полученные данные на сервер
+      await sendAudioToServer(audioData);
+
+      setIsRecording(false);
+
+    } catch (error) {
+      console.error('Error in handleFinish:', error);
+    }
+};
+
+  const startAudioRecording = async () => {
+    try {
+      if (streamRef.current) {
+        const audioTrack = streamRef.current.getAudioTracks()[0];
+        const audioStream = new MediaStream([audioTrack]);
+        
+        const newMediaRecorder = new MediaRecorder(audioStream, {
+          mimeType: 'audio/webm'
+        });
+  
+        newMediaRecorder.addEventListener('dataavailable', (e) => {
+          if (e.data.size > 0) {
+            chunksRef.current.push(e.data);
+          }
+        });
+  
+        mediaRecorderRef.current = newMediaRecorder;
+        mediaRecorderRef.current.start();
+        setIsRecording(true);
+      }
+    } catch (err) {
+      console.error("Error starting audio recording:", err);
+    }
+  };
+  
+  const sendAudioToServer = async (audioBlob) => {
+      try {
+        const formData = new FormData();
+
+        formData.append('audio', audioBlob, 'recording.wav');
+        console.log("send to server")
+  
+        const response = await fetch('http://127.0.0.1:8000/audio-getter/', {
+          method: 'POST',
+          body: formData,
+        });
+  
+        if (!response.ok) {
+          throw new Error('Network response was not ok');
+        }
+  
+        const data = await response.json();
+        // console.log('File path:', data.file_path);
+        console.log('Message:', data.message);
+  
+        setInterviewText(data.message);
+  
+        setTimeout(async () => {
+          await startAudioRecording();
+        }, 500);  
+  
+      } catch (error) {
+        console.error('Error sending audio to server:', error);
+      }
+  };
 
   return (
     <div className="body">
@@ -100,7 +189,7 @@ const Simulation = () => {
               ref={videoRef}
               autoPlay
               playsInline
-              muted // важно для избежания фидбэка
+              muted
               className="video-stream"
             />
           </div>
@@ -110,7 +199,7 @@ const Simulation = () => {
             15:35
           </div>
 
-          <button className="submit-button">
+          <button className="submit-button" onClick={handleFinish}>
             Завершить ответ
           </button>
         </div>
