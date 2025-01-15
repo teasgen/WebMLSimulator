@@ -5,12 +5,40 @@ import '../themes/dark.css';
 const Simulation = () => {
   const videoRef = useRef(null);
   const mediaRecorderRef = useRef(null);
-  const [isRecording, setIsRecording] = useState(false);
   const chunksRef = useRef([]);
   const streamRef = useRef(null);
 
+  const timerRef = useRef(null);
+  const isTimerRunningRef = useRef(false);
+  const [seconds, setSeconds] = useState(0);
+  const timerIntervalRef = useRef(null);
+  const maxDuration = 5;
+
   const [interviewText, setInterviewText] = useState('');
   const [answerText, setAnswerText] = useState('');
+  const startTimer = () => {
+    setSeconds(0);
+    isTimerRunningRef.current = true;
+    timerIntervalRef.current = setInterval(() => {
+      setSeconds((prev) => {
+        if (prev >= maxDuration) {
+          handleFinish();
+          return prev;
+        }
+        return prev + 1;
+      });
+    }, 1000);
+  };
+  
+  const stopTimer = () => {
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+    isTimerRunningRef.current = false;
+    setSeconds(0);
+  };
+
   useEffect(() => {
     const videoElement = videoRef.current;
     let stream = null;
@@ -38,14 +66,13 @@ const Simulation = () => {
         mediaRecorderRef.current = mediaRecorder;
 
         mediaRecorder.start();
-        setIsRecording(true);
-
       } catch (err) {
         console.error("Error accessing media devices:", err);
       }
     };
-
+    
     startMedia();
+    startTimer();
 
     return () => {
       if (stream) {
@@ -57,12 +84,17 @@ const Simulation = () => {
       if (mediaRecorder && mediaRecorder.state !== 'inactive') {
         mediaRecorder.stop();
       }
-      setIsRecording(false);
+      stopTimer();
     };
   }, []);
 
   const handleFinish = async () => {
-    if (!mediaRecorderRef.current || !isRecording) {
+    if (!isTimerRunningRef.current) return;
+    isTimerRunningRef.current = false;
+    stopTimer();
+
+    if (!mediaRecorderRef.current || mediaRecorderRef.current.state === 'inactive') {
+      console.warn('MediaRecorder is not active');
       return;
     }
 
@@ -86,16 +118,11 @@ const Simulation = () => {
         mediaRecorderRef.current.addEventListener('dataavailable', onDataAvailable);
         mediaRecorderRef.current.addEventListener('stop', onStop);
         
-        // Запрашиваем данные и останавливаем запись
         mediaRecorderRef.current.requestData();
         mediaRecorderRef.current.stop();
       });
 
-      // Отправляем полученные данные на сервер
       await sendAudioToServer(audioData);
-
-      setIsRecording(false);
-
     } catch (error) {
       console.error('Error in handleFinish:', error);
     }
@@ -119,7 +146,7 @@ const Simulation = () => {
   
         mediaRecorderRef.current = newMediaRecorder;
         mediaRecorderRef.current.start();
-        setIsRecording(true);
+        startTimer();
       }
     } catch (err) {
       console.error("Error starting audio recording:", err);
@@ -143,7 +170,6 @@ const Simulation = () => {
         }
   
         const data = await response.json();
-        // console.log('File path:', data.file_path);
         console.log('Message:', data.message);
   
         setInterviewText(data.message);
@@ -156,6 +182,16 @@ const Simulation = () => {
         console.error('Error sending audio to server:', error);
       }
   };
+
+  useEffect(() => {
+    if (timerRef.current) {
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = seconds % 60;
+        timerRef.current.textContent = 
+            `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
+      }
+  }, [seconds]);
+
 
   return (
     <div className="body">
@@ -181,9 +217,6 @@ const Simulation = () => {
         </div>
 
         <div className="right-panel">
-          {/* <div className="avatar-container">
-            <img src="../logo512.png" alt="Profile" className="avatar" />
-          </div> */}
           <div className="video-container">
             <video
               ref={videoRef}
@@ -194,7 +227,10 @@ const Simulation = () => {
             />
           </div>
 
-          
+          <div ref={timerRef} className="time-display">
+            00:00
+          </div>
+
           <div className="time-display">
             15:35
           </div>
