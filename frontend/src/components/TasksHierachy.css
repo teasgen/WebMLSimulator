@@ -1,0 +1,23 @@
+.container {
+  background-color: #1a1a1a;
+  width: 100vw;
+  height: 100vh;
+  padding: 20px;
+  color: white;
+  box-sizing: border-box;
+  overflow-y: auto;
+}
+  
+.main-content {
+  display: flex;
+  gap: 20px;
+}
+
+.middle-text {
+  word-wrap: break-word;
+}
+
+.ol {
+  padding-left: 20px; /* Для отступа под нумерацию списка */
+}
+

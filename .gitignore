@@ -7,3 +7,8 @@ frontend/node_modules
 # temporary data
 *.wav
 *.wepm
+*.csv
+*.tar
+
+# vs code
+*.code-workspace

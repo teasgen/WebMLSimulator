@@ -2,7 +2,11 @@ import React, { useState, useRef, useEffect } from 'react';
 import './Simulation.css';
 import '../themes/dark.css';
 
+import { useNavigateToMenu } from './common';
+
 const Simulation = () => {
+  const navigateToMenu = useNavigateToMenu();
+
   const videoRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
@@ -241,7 +245,7 @@ const Simulation = () => {
         </div>
       </div>
 
-      <button className="exit-button">
+      <button className="exit-button" onClick={navigateToMenu}>
         Выйти
       </button>
     </div>

@@ -1,19 +1,26 @@
-from rest_framework import status
+import os
+
+from rest_framework import status, generics
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.core.files.storage import default_storage
-from django.core.files.base import ContentFile
+from pydub import AudioSegment
+
+from .models import Tasks
+from .serialiazers import TasksSerializer
 
 
 class ThemesGeneration(APIView):
     def post(self, request, *args, **kwargs):
         response = {"themes": ["decision trees"]}
         return Response(response, status=status.HTTP_201_CREATED)
+    
 
+class TasksGetter(generics.ListCreateAPIView):
+    queryset = Tasks.objects.all()
+    serializer_class = TasksSerializer
 
-import os
-from pydub import AudioSegment
 
 class AudioGetter(APIView):
     parser_classes = (MultiPartParser, FormParser)
@@ -50,3 +57,20 @@ class AudioGetter(APIView):
                 {'error': str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+class LLMResponseGetter(APIView):
+    def post(self, request):
+        try:
+            prompt = request.data.get('prompt')
+            return Response({
+                'message': f'Prompt: {prompt}, successfully',
+            }, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            print(e)
+            return Response(
+                {'error': str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        
