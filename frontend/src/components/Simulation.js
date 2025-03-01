@@ -1,32 +1,44 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate } from "react-router";
 import './Simulation.css';
 import '../themes/dark.css';
 
+import { getLLMResponse } from "../services/ApiService";
 import { useNavigateToMenu } from './common';
 
 const Simulation = () => {
   const navigateToMenu = useNavigateToMenu();
+  const navigate = useNavigate();
 
   const videoRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
   const streamRef = useRef(null);
 
+  const [intervalSeconds, setIntervalSeconds] = useState(0);
+  const [sessionSeconds, setSessionSeconds] = useState(0);
+
+  // interval timer
   const timerRef = useRef(null);
   const isTimerRunningRef = useRef(false);
-  const [seconds, setSeconds] = useState(0);
   const timerIntervalRef = useRef(null);
-  const maxDuration = 5;
+  const maxDuration = 50;
+
+  // session timer
+  const sessionTimerRef = useRef(null);
+  const isSessionTimerRunningRef = useRef(false);
+  const maxSessionDuration = 500;
 
   const [interviewText, setInterviewText] = useState('');
   const [answerText, setAnswerText] = useState('');
+
   const startTimer = () => {
-    setSeconds(0);
+    setIntervalSeconds(0);
     isTimerRunningRef.current = true;
     timerIntervalRef.current = setInterval(() => {
-      setSeconds((prev) => {
+      setIntervalSeconds((prev) => {
         if (prev >= maxDuration) {
-          handleFinish();
+          handleFinishQABlock();
           return prev;
         }
         return prev + 1;
@@ -40,8 +52,63 @@ const Simulation = () => {
       timerIntervalRef.current = null;
     }
     isTimerRunningRef.current = false;
-    setSeconds(0);
+    setIntervalSeconds(0);
   };
+
+  const startSessionTimer = () => {
+    setSessionSeconds(0);
+    isSessionTimerRunningRef.current = true;
+    sessionTimerRef.current = setInterval(() => {
+      setSessionSeconds(prev => {
+        if (prev >= maxSessionDuration) {
+          endSession();
+          return prev;
+        }
+        return prev + 1;
+      });
+    }, 1000);
+  };
+
+  const stopSessionTimer = () => {
+    if (sessionTimerRef.current) {
+      clearInterval(sessionTimerRef.current);
+      sessionTimerRef.current = null;
+    }
+    setSessionSeconds(0);
+  };
+
+  useEffect(() => {
+    if (timerRef.current) {
+        // const minutes = Math.floor(seconds / 60);
+        // const remainingSeconds = seconds % 60;
+        const remainingSeconds = maxDuration - intervalSeconds
+        const minutes = Math.floor(remainingSeconds / 60);
+        const seconds = remainingSeconds % 60;
+        timerRef.current.textContent = 
+            `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+      }
+  }, [intervalSeconds]);
+
+  useEffect(() => {
+    if (sessionTimerRef.current) {
+        const minutes = Math.floor(sessionSeconds / 60);
+        const seconds = sessionSeconds % 60;
+        sessionTimerRef.current.textContent = 
+            `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+      }
+  }, [sessionSeconds]);
+
+  const endSession = async () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    stopSessionTimer();
+    stopTimer();
+    setTimeout(() => {
+      navigate("/menu"); // Move to the intended page after stopping everything
+    }, 0);
+  };
+
 
   useEffect(() => {
     const videoElement = videoRef.current;
@@ -77,8 +144,15 @@ const Simulation = () => {
     
     startMedia();
     startTimer();
+    if (!isSessionTimerRunningRef.current) {
+      startSessionTimer();
+    }
 
     return () => {
+      if (sessionTimerRef.current) {
+        clearInterval(sessionTimerRef.current);
+        sessionTimerRef.current = null;
+      }
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
       }
@@ -92,7 +166,7 @@ const Simulation = () => {
     };
   }, []);
 
-  const handleFinish = async () => {
+  const handleFinishQABlock = async () => {
     if (!isTimerRunningRef.current) return;
     isTimerRunningRef.current = false;
     stopTimer();
@@ -126,11 +200,14 @@ const Simulation = () => {
         mediaRecorderRef.current.stop();
       });
 
-      await sendAudioToServer(audioData);
+      const audio_transcription = await sendAudioToServer(audioData);
+      console.log("audio_transcription: ", audio_transcription)
+      const llm_answer = await sendQuestionToServer(interviewText, answerText, audio_transcription);
+      console.log("llm_answer: ", llm_answer)
     } catch (error) {
       console.error('Error in handleFinish:', error);
     }
-};
+  };
 
   const startAudioRecording = async () => {
     try {
@@ -162,7 +239,7 @@ const Simulation = () => {
         const formData = new FormData();
 
         formData.append('audio', audioBlob, 'recording.wav');
-        console.log("send to server")
+        console.log("send audio to server")
   
         const response = await fetch('http://127.0.0.1:8000/audio-getter/', {
           method: 'POST',
@@ -176,26 +253,27 @@ const Simulation = () => {
         const data = await response.json();
         console.log('Message:', data.message);
   
-        setInterviewText(data.message);
-  
         setTimeout(async () => {
           await startAudioRecording();
         }, 500);  
+
+        return data.message
   
       } catch (error) {
         console.error('Error sending audio to server:', error);
       }
   };
+  
+  const sendQuestionToServer = async (question, answer_text, answer_audio) => {
+    const prompt = {
+      "prompt": "Вопрос: " + question + "\nОтвет текстом: " + answer_text + "\nОтвет аудио: " + answer_audio
+    };
 
-  useEffect(() => {
-    if (timerRef.current) {
-        const minutes = Math.floor(seconds / 60);
-        const remainingSeconds = seconds % 60;
-        timerRef.current.textContent = 
-            `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
-      }
-  }, [seconds]);
+    console.log("send answer to server")
+    const answer = await getLLMResponse(prompt);
 
+    return answer.message;
+  };
 
   return (
     <div className="body">
@@ -235,11 +313,11 @@ const Simulation = () => {
             00:00
           </div>
 
-          <div className="time-display">
-            15:35
+          <div ref={sessionTimerRef} className="time-display">
+            00:00
           </div>
 
-          <button className="submit-button" onClick={handleFinish}>
+          <button className="submit-button" onClick={handleFinishQABlock}>
             Завершить ответ
           </button>
         </div>

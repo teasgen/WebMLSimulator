@@ -22,7 +22,7 @@ function App() {
     const data = {"prompt": "Вопрос: " + taskText + "\nОтвет: " + answerText};
 
     getLLMResponse(data)
-      .then((answer) => {
+      .then((answer) => { 
         setSystemAnswer(answer.message);
       })
   };

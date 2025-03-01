@@ -9,6 +9,11 @@ frontend/node_modules
 *.wepm
 *.csv
 *.tar
+*.DS_Store
+*tmp*
 
 # vs code
 *.code-workspace
+
+#GigaAM repo
+GigaAM

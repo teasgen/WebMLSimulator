@@ -1,4 +1,6 @@
 import os
+import requests
+from random import shuffle
 
 from rest_framework import status, generics
 from rest_framework.response import Response
@@ -12,8 +14,14 @@ from .serialiazers import TasksSerializer
 
 
 class ThemesGeneration(APIView):
-    def post(self, request, *args, **kwargs):
-        response = {"themes": ["decision trees"]}
+    def get(self, request):
+        tasks = Tasks.objects.all()
+        themes = set()
+        for task in tasks:
+            themes.add(task.category)
+        themes = list(themes)
+        shuffle(themes)
+        response = {"themes": themes[:5]}
         return Response(response, status=status.HTTP_201_CREATED)
     
 
@@ -32,10 +40,6 @@ class AudioGetter(APIView):
                 return Response({'error': 'No audio file provided'}, 
                               status=status.HTTP_400_BAD_REQUEST)
 
-            # file_path = default_storage.save(
-            #     f'audio_recordings/{audio_file.name}', 
-            #     ContentFile(audio_file.read())
-            # )
             webm_path = 'temp_audio.webm'
             with open(webm_path, 'wb+') as destination:
                 for chunk in audio_file.chunks():
@@ -47,8 +51,16 @@ class AudioGetter(APIView):
 
             os.remove(webm_path)
 
+            with open(wav_path, "rb") as audio_file:
+                transription = requests.post(
+                    url="http://localhost:3001/transcribe/",
+                    files={"audio": audio_file}
+                )
+            if transription.status_code != 200:
+                raise RuntimeError(transription.reason)
+
             return Response({
-                'message': 'Audio file received successfully',
+                'message': transription,
             }, status=status.HTTP_201_CREATED)
 
         except Exception as e:
