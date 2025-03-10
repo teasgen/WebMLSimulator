@@ -33,6 +33,9 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
+AUDIO_ANSWER_URL = "http://localhost:3001/transcribe/"
+VALIDATE_ANSWER_URL = "http://localhost:3002/validate/"
+
 
 # Application definition
 

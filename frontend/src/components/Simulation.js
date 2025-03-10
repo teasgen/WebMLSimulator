@@ -3,10 +3,12 @@ import { useNavigate } from "react-router";
 import './Simulation.css';
 import '../themes/dark.css';
 
-import { getLLMResponse } from "../services/ApiService";
+import { getLLMResponse, updateLogsDB } from "../services/ApiService";
 import { useNavigateToMenu } from './common';
 
 const Simulation = () => {
+  const [startTime, setStartTime] = useState(null);
+
   const navigateToMenu = useNavigateToMenu();
   const navigate = useNavigate();
 
@@ -22,7 +24,7 @@ const Simulation = () => {
   const timerRef = useRef(null);
   const isTimerRunningRef = useRef(false);
   const timerIntervalRef = useRef(null);
-  const maxDuration = 50;
+  const maxDuration = 10;
 
   // session timer
   const sessionTimerRef = useRef(null);
@@ -111,6 +113,9 @@ const Simulation = () => {
 
 
   useEffect(() => {
+    const now = new Date();
+    setStartTime(now);
+
     const videoElement = videoRef.current;
     let stream = null;
     let mediaRecorder = null;
@@ -202,10 +207,22 @@ const Simulation = () => {
 
       const audio_transcription = await sendAudioToServer(audioData);
       console.log("audio_transcription: ", audio_transcription)
+      const old_question = interviewText;
+      const text_answer = answerText;
       const llm_answer = await sendQuestionToServer(interviewText, answerText, audio_transcription);
       console.log("llm_answer: ", llm_answer)
+      let mark = llm_answer["mark"]
+      const validation_system_comment = llm_answer["comment"]
+      // check should we generate new questiom
+      mark = 10
+      if (mark >= 0) {
+        // TODO: theme generation
+        await sendQuestionGenerationToServer("Свёрточные сети");
+      }
+      await sendUpdateLogsDBToServer(old_question, text_answer, audio_transcription, validation_system_comment, mark)
+      await startAudioRecording();
     } catch (error) {
-      console.error('Error in handleFinish:', error);
+      console.error('Error in handleFinishQABlock:', error);
     }
   };
 
@@ -233,7 +250,7 @@ const Simulation = () => {
       console.error("Error starting audio recording:", err);
     }
   };
-  
+
   const sendAudioToServer = async (audioBlob) => {
       try {
         const formData = new FormData();
@@ -252,10 +269,6 @@ const Simulation = () => {
   
         const data = await response.json();
         console.log('Message:', data.message);
-  
-        setTimeout(async () => {
-          await startAudioRecording();
-        }, 500);  
 
         return data.message
   
@@ -263,16 +276,145 @@ const Simulation = () => {
         console.error('Error sending audio to server:', error);
       }
   };
+
+  const handleValidationLLMStreamingResponse = async (prompt) => {
+    setInterviewText('');
+
+    let localInterviewText = '';
+    let localRating = '';
+    let localSystemComment = '';
+
+    try {
+      const reader = await getLLMResponse(prompt);
+      const decoder = new TextDecoder('utf-8');
+      let current_key = "";
+      let is_key = true;
+      let current_str = "";
+      let new_question_doesnt_required = false;
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        current_str = decoder.decode(value, { stream: true });
+        if (current_str[0] === "{")
+            current_str = current_str.slice(1);
+        if (current_str.includes("<|im_end|>"))
+            current_str = current_str.slice(0, current_str.indexOf("<|im_end|>"))
+        if (current_str[current_str.length - 1] === "}")
+            current_str = current_str.slice(0, current_str.length - 1);
+
+        const parts = current_str.split(/\s+/);
+        for (let i = 0; i < parts.length; i++) {
+            let cur = parts[i].trim();
+            if (cur === "" || cur === "\n")
+                continue
+            if (cur.includes("\"Новый") || cur.includes("\"Комментарий") || cur.includes("\"Оценка")) {
+                is_key = true;
+                cur = cur.slice(1); // remove " at the beginning, check whether key is a single word
+                const index = cur.indexOf("\":");
+                if (index !== -1) {
+                    current_key = cur.slice(0, index);
+                    is_key = false;
+                }
+                else
+                    current_key = cur + " ";
+            }
+            else if (cur.includes("\":")) {
+                let idx = cur.indexOf("\":");
+                let remain_key = cur.slice(0, idx);
+                current_key += remain_key; // remove ": at the end of key
+                is_key = false;
+            }
+            else {
+                cur = cur.replace(/"/g, "");
+                if (is_key)
+                    current_key += cur + " ";
+                else {
+                    current_key = current_key.trim();
+                    if (cur[cur.length - 1] === ",")
+                    cur = cur.slice(0, cur.length - 1);
+                    if (current_key === "Новый вопрос" && !new_question_doesnt_required) {
+                      localInterviewText += cur + " ";
+                      setInterviewText(localInterviewText);
+                    }
+                    else if (current_key === "Комментарий проверяющей системы") {
+                      localSystemComment = cur;
+                    }
+                    else if (current_key === "Оценка") {
+                      localRating = parseFloat(cur);
+                      if (localRating > 8)
+                        new_question_doesnt_required = true;
+                    }            
+                }
+            }
+        }
+      }
+      return { "interviewText": localInterviewText, "systemComment": localSystemComment, "rating": localRating };
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    }
+  };
+
+  const handleQuestionGenerationLLMStreamingResponse = async (prompt) => {
+    setInterviewText('');
+
+    let localInterviewText = '';
+    try {
+      const reader = await getLLMResponse(prompt);
+      const decoder = new TextDecoder('utf-8');
   
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        let current_str = decoder.decode(value, { stream: true });
+        if (current_str.includes("<|im_end|>"))
+            current_str = current_str.slice(0, current_str.indexOf("<|im_end|>"))
+
+        localInterviewText += current_str.trim() + " ";
+        setInterviewText(localInterviewText);
+      }
+      return { "interviewText": localInterviewText};
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    }
+  };
+
   const sendQuestionToServer = async (question, answer_text, answer_audio) => {
     const prompt = {
-      "prompt": "Вопрос: " + question + "\nОтвет текстом: " + answer_text + "\nОтвет аудио: " + answer_audio
+      "prompt": "{" + "\"Вопрос\": " + question + "\"Ответ пользователя\": " + answer_audio + "\n" + answer_text + "}",
+      "use_validation_system_prompt": true,
     };
 
     console.log("send answer to server")
-    const answer = await getLLMResponse(prompt);
+    const result = await handleValidationLLMStreamingResponse(prompt);
+    return { "new_quesiton": result.interviewText, "comment": result.systemComment, "mark": result.localRating };
+  };
 
-    return answer.message;
+  const sendQuestionGenerationToServer = async (theme) => {
+    const prompt = {
+      "prompt": "Придумай строго один теоретический вопрос по машинному обучению по теме " + theme,
+      "use_validation_system_prompt": false,
+    };
+
+    console.log("send answer to server")
+    const result = await handleQuestionGenerationLLMStreamingResponse(prompt);
+    return { "new_quesiton": result.interviewText};
+  };
+
+  const sendUpdateLogsDBToServer = async (question, answer_text, answer_audio, validation_system_comment, mark) => {
+    const QABlock = {
+      "userID": "0",
+      "start_time": startTime,
+      "question": question,
+      "answer": answer_audio + "\n" + answer_text,
+      "comment": validation_system_comment,
+      "mark": mark,
+    };
+
+    console.log("send new QA block to server")
+    await updateLogsDB(QABlock);
   };
 
   return (

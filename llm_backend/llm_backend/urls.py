@@ -14,9 +14,9 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
-from django.contrib import admin
 from django.urls import path
+from llm_model_api.views import ValidateAnswer
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    path('validate/', ValidateAnswer.as_view(), name='validate'),
 ]
