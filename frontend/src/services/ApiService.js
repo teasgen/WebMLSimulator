@@ -20,4 +20,14 @@ export const updateLogsDB = async (data) => {
     });
     return await response.json();
 };
-  
+
+export const getThemes = async () => {
+    const response = await fetch('http://127.0.0.1:8000/interview-themes/', {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+    });
+
+    return await response.json();
+};

@@ -7,6 +7,7 @@ from rest_framework import status, generics
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.permissions import IsAuthenticated
 
 from django.http import StreamingHttpResponse
 from django.core.files.storage import default_storage
@@ -147,6 +148,7 @@ class UpdateLogsDBGetter(APIView):
                 "comment": data.get("comment"),
                 "mark": data.get("mark"),
             }
+            print(current_qa_block)
 
             naive_datetime = parse_datetime(data.get("start_time"))
             datetime = naive_datetime.replace(tzinfo=ZoneInfo("Etc/GMT-3"))
@@ -171,4 +173,14 @@ class UpdateLogsDBGetter(APIView):
                 {'error': str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-        
+
+
+class UserDataView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        return Response({
+            'id': request.user.id,
+            'username': request.user.username,
+            'email': request.user.email,
+        })

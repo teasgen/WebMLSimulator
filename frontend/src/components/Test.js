@@ -125,12 +125,6 @@ function App() {
         <pre style={headerStyles}>
           {newQuestion}
         </pre>
-        <pre style={headerStyles}>
-          {systemComment}
-        </pre>
-        <pre style={headerStyles}>
-          {rating}
-        </pre>
       </div>
     </div>
   );

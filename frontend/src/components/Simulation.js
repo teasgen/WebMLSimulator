@@ -3,14 +3,15 @@ import { useNavigate } from "react-router";
 import './Simulation.css';
 import '../themes/dark.css';
 
-import { getLLMResponse, updateLogsDB } from "../services/ApiService";
+import { getLLMResponse, updateLogsDB, getThemes } from "../services/ApiService";
 import { useNavigateToMenu } from './common';
 
 const Simulation = () => {
-  const [startTime, setStartTime] = useState(null);
+  const [startTime, setStartTime] = useState(new Date().toISOString());
 
   const navigateToMenu = useNavigateToMenu();
   const navigate = useNavigate();
+  const themesRef = useRef(null);
 
   const videoRef = useRef(null);
   const mediaRecorderRef = useRef(null);
@@ -27,12 +28,23 @@ const Simulation = () => {
   const maxDuration = 10;
 
   // session timer
-  const sessionTimerRef = useRef(null);
+  const sessionTimerIntervalRef = useRef(null);
+  const sessionTimerDisplayRef = useRef(null);
   const isSessionTimerRunningRef = useRef(false);
   const maxSessionDuration = 500;
 
-  const [interviewText, setInterviewText] = useState('');
+  const [interviewText, setInterviewText] = useState('Generating new question...');
   const [answerText, setAnswerText] = useState('');
+  const interviewTextRef = useRef(interviewText);
+  const answerTextRef = useRef(answerText);
+
+  useEffect(() => {
+    interviewTextRef.current = interviewText;
+  }, [interviewText]);
+  
+  useEffect(() => {
+    answerTextRef.current = answerText;
+  }, [answerText]);  
 
   const startTimer = () => {
     setIntervalSeconds(0);
@@ -60,7 +72,7 @@ const Simulation = () => {
   const startSessionTimer = () => {
     setSessionSeconds(0);
     isSessionTimerRunningRef.current = true;
-    sessionTimerRef.current = setInterval(() => {
+    sessionTimerIntervalRef.current = setInterval(() => {
       setSessionSeconds(prev => {
         if (prev >= maxSessionDuration) {
           endSession();
@@ -72,10 +84,11 @@ const Simulation = () => {
   };
 
   const stopSessionTimer = () => {
-    if (sessionTimerRef.current) {
-      clearInterval(sessionTimerRef.current);
-      sessionTimerRef.current = null;
+    if (sessionTimerIntervalRef.current) {
+      clearInterval(sessionTimerIntervalRef.current);
+      sessionTimerIntervalRef.current = null;
     }
+    isSessionTimerRunningRef.current = false;
     setSessionSeconds(0);
   };
 
@@ -92,10 +105,10 @@ const Simulation = () => {
   }, [intervalSeconds]);
 
   useEffect(() => {
-    if (sessionTimerRef.current) {
+    if (sessionTimerDisplayRef.current) {
         const minutes = Math.floor(sessionSeconds / 60);
         const seconds = sessionSeconds % 60;
-        sessionTimerRef.current.textContent = 
+        sessionTimerDisplayRef.current.textContent = 
             `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
       }
   }, [sessionSeconds]);
@@ -111,53 +124,57 @@ const Simulation = () => {
     }, 0);
   };
 
-
   useEffect(() => {
-    const now = new Date();
-    setStartTime(now);
-
+    const fetchThemes = async () => {
+      try {
+        const themesData = await getThemes();
+        themesRef.current = themesData;
+        console.log(themesRef.current.themes[0])
+        await sendQuestionGenerationToServer(themesRef.current.themes[0]);
+        themesRef.current.themes = themesRef.current.themes.slice(1);
+      } catch (error) {
+        console.error("Error during themes getting process:", error);
+      }
+    };
     const videoElement = videoRef.current;
     let stream = null;
     let mediaRecorder = null;
 
-    const startMedia = async () => {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: true
-        });
-        
-        streamRef.current = stream;
+    fetchThemes().then(() => {
+      const startMedia = async () => {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: true
+          });
+          
+          streamRef.current = stream;
 
-        if (videoElement) {
-          videoElement.srcObject = stream;
+          if (videoElement) {
+            videoElement.srcObject = stream;
+          }
+
+          const audioTrack = stream.getAudioTracks()[0];
+          const audioStream = new MediaStream([audioTrack]);
+          
+          mediaRecorder = new MediaRecorder(audioStream, {
+            mimeType: 'audio/webm'
+          });
+          mediaRecorderRef.current = mediaRecorder;
+
+          mediaRecorder.start();
+        } catch (err) {
+          console.error("Error accessing media devices:", err);
         }
-
-        const audioTrack = stream.getAudioTracks()[0];
-        const audioStream = new MediaStream([audioTrack]);
-        
-        mediaRecorder = new MediaRecorder(audioStream, {
-          mimeType: 'audio/webm'
-        });
-        mediaRecorderRef.current = mediaRecorder;
-
-        mediaRecorder.start();
-      } catch (err) {
-        console.error("Error accessing media devices:", err);
+      };
+      startMedia();
+      startTimer();
+      if (!isSessionTimerRunningRef.current) {
+        startSessionTimer();
       }
-    };
-    
-    startMedia();
-    startTimer();
-    if (!isSessionTimerRunningRef.current) {
-      startSessionTimer();
-    }
+    });
 
     return () => {
-      if (sessionTimerRef.current) {
-        clearInterval(sessionTimerRef.current);
-        sessionTimerRef.current = null;
-      }
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
       }
@@ -168,6 +185,7 @@ const Simulation = () => {
         mediaRecorder.stop();
       }
       stopTimer();
+      stopSessionTimer();
     };
   }, []);
 
@@ -205,21 +223,23 @@ const Simulation = () => {
         mediaRecorderRef.current.stop();
       });
 
+      console.log(startTime);
       const audio_transcription = await sendAudioToServer(audioData);
-      console.log("audio_transcription: ", audio_transcription)
-      const old_question = interviewText;
-      const text_answer = answerText;
-      const llm_answer = await sendQuestionToServer(interviewText, answerText, audio_transcription);
+      const old_question = interviewTextRef.current;
+      const text_answer = answerTextRef.current;   
+      console.log("old_question: ", old_question)
+      console.log("text_answer: ", text_answer)
+      console.log("audio_transcription: ", audio_transcription[0])
+      const llm_answer = await sendQuestionToServer(old_question, text_answer, audio_transcription);
       console.log("llm_answer: ", llm_answer)
       let mark = llm_answer["mark"]
       const validation_system_comment = llm_answer["comment"]
       // check should we generate new questiom
-      mark = 10
-      if (mark >= 0) {
-        // TODO: theme generation
-        await sendQuestionGenerationToServer("Свёрточные сети");
+      if (mark >= 8) {
+        await sendQuestionGenerationToServer(themesRef.current.themes[0]);
+        themesRef.current.themes = themesRef.current.themes.slice(1);
       }
-      await sendUpdateLogsDBToServer(old_question, text_answer, audio_transcription, validation_system_comment, mark)
+      await sendUpdateLogsDBToServer(old_question, text_answer, audio_transcription[0], validation_system_comment, mark)
       await startAudioRecording();
     } catch (error) {
       console.error('Error in handleFinishQABlock:', error);
@@ -278,12 +298,11 @@ const Simulation = () => {
   };
 
   const handleValidationLLMStreamingResponse = async (prompt) => {
-    setInterviewText('');
+    setInterviewText('Validating answer...');
 
     let localInterviewText = '';
     let localRating = '';
     let localSystemComment = '';
-
     try {
       const reader = await getLLMResponse(prompt);
       const decoder = new TextDecoder('utf-8');
@@ -339,7 +358,7 @@ const Simulation = () => {
                       setInterviewText(localInterviewText);
                     }
                     else if (current_key === "Комментарий проверяющей системы") {
-                      localSystemComment = cur;
+                      localSystemComment += cur + " ";
                     }
                     else if (current_key === "Оценка") {
                       localRating = parseFloat(cur);
@@ -383,16 +402,17 @@ const Simulation = () => {
 
   const sendQuestionToServer = async (question, answer_text, answer_audio) => {
     const prompt = {
-      "prompt": "{" + "\"Вопрос\": " + question + "\"Ответ пользователя\": " + answer_audio + "\n" + answer_text + "}",
+      "prompt": "{" + "\"Вопрос\": " + question + ", \"Ответ пользователя\": " + answer_audio + ". " + answer_text + "}",
       "use_validation_system_prompt": true,
     };
 
     console.log("send answer to server")
     const result = await handleValidationLLMStreamingResponse(prompt);
-    return { "new_quesiton": result.interviewText, "comment": result.systemComment, "mark": result.localRating };
+    return { "new_quesiton": result.interviewText, "comment": result.systemComment, "mark": result.rating };
   };
 
   const sendQuestionGenerationToServer = async (theme) => {
+    setInterviewText('Generating new question...');
     const prompt = {
       "prompt": "Придумай строго один теоретический вопрос по машинному обучению по теме " + theme,
       "use_validation_system_prompt": false,
@@ -412,6 +432,7 @@ const Simulation = () => {
       "comment": validation_system_comment,
       "mark": mark,
     };
+    console.log(QABlock);
 
     console.log("send new QA block to server")
     await updateLogsDB(QABlock);
@@ -455,7 +476,7 @@ const Simulation = () => {
             00:00
           </div>
 
-          <div ref={sessionTimerRef} className="time-display">
+          <div ref={sessionTimerDisplayRef} className="time-display">
             00:00
           </div>
 

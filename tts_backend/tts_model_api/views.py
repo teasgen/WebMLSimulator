@@ -26,6 +26,6 @@ class TranscribeAudio(APIView):
 
             os.remove(audio_path)
 
-            return Response({"transcriptions": ". ".join(transcriptions)}, status=status.HTTP_200_OK)
+            return Response(". ".join(transcriptions), status=status.HTTP_200_OK)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
