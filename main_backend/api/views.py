@@ -31,7 +31,7 @@ class ThemesGeneration(APIView):
         themes = list(themes)
         shuffle(themes)
         response = {"themes": themes[:5]}
-        return Response(response, status=status.HTTP_201_CREATED)
+        return Response(response, status=status.HTTP_200_OK)
     
 
 class TasksGetter(generics.ListCreateAPIView):
@@ -89,7 +89,7 @@ class LLMResponseGetter(APIView):
     
     def post(self, request, format=None):
         prompt = request.data.get('prompt', '')
-        use_validation_system_prompt = request.data.get('use_validation_system_prompt', True)
+        system_prompt_type = request.data.get('system_prompt_type', 0)
         
         if prompt == "":
             return Response({"error": "Prompt is required"}, status=status.HTTP_400_BAD_REQUEST)
@@ -97,7 +97,7 @@ class LLMResponseGetter(APIView):
         # Prepare the data to send to the ValidateAnswer service
         data = {
             'prompt': prompt,
-            'use_validation_system_prompt': use_validation_system_prompt
+            'system_prompt_type': system_prompt_type,
         }
 
         validate_answer_url = getattr(settings, 'VALIDATE_ANSWER_URL')
@@ -119,7 +119,7 @@ class LLMResponseGetter(APIView):
                                 buffer = b""
                             else:
                                 buffer += chunk
-                                
+
                     if buffer:
                         print(f"Sending remaining: {buffer.decode('utf-8', errors='replace')}")
                         yield buffer
@@ -138,34 +138,51 @@ class LLMResponseGetter(APIView):
             content_type='text/event-stream'
         )
         
-class UpdateLogsDBGetter(APIView):
+class LogsDB(APIView):
+    permission_classes = [IsAuthenticated]
+
     def patch(self, request):
         try:
             data = request.data
-            current_qa_block = {
-                "question": data.get("question"),
-                "answer": data.get("answer"),
-                "comment": data.get("comment"),
-                "mark": data.get("mark"),
-            }
-            print(current_qa_block)
+            if data.get("is_ended") is None:
+                current_qa_block = {
+                    "question": data.get("question"),
+                    "answer": data.get("answer"),
+                    "comment": data.get("comment"),
+                    "mark": data.get("mark"),
+                }
 
-            naive_datetime = parse_datetime(data.get("start_time"))
-            datetime = naive_datetime.replace(tzinfo=ZoneInfo("Etc/GMT-3"))
+                naive_datetime = parse_datetime(data.get("start_time"))
+                datetime = naive_datetime.replace(tzinfo=ZoneInfo("Etc/GMT-3"))
 
-            instance, _ = SimulationInstance.objects.get_or_create(
-                userID=data.get("userID"),
-                datetime=datetime,
-                defaults={'qa_blocks': []}
-            )
+                instance, _ = SimulationInstance.objects.get_or_create(
+                    userID=data.get("userID"),
+                    datetime=datetime,
+                    defaults={'qa_blocks': []}
+                )
 
-            instance.qa_blocks.append(current_qa_block)
-            instance.save()
+                instance.qa_blocks.append(current_qa_block)
+                instance.save()
 
-            return Response(
-                {'response': f"QA block {current_qa_block} was successfully added"}, 
-                status=status.HTTP_201_CREATED
-            )
+                return Response(
+                    {'response': f"QA block {current_qa_block} was successfully added"}, 
+                    status=status.HTTP_201_CREATED
+                )
+            else:
+                naive_datetime = parse_datetime(data.get("start_time"))
+                datetime = naive_datetime.replace(tzinfo=ZoneInfo("Etc/GMT-3"))
+
+                instance, _ = SimulationInstance.objects.get(
+                    userID=data.get("userID"),
+                    datetime=datetime,
+                )
+
+                instance.is_ended = data.get("is_ended")
+                instance.save()
+                return Response(
+                    {'response': f"Simulation instance is_ended set"}, 
+                    status=status.HTTP_201_CREATED
+                )
 
         except Exception as e:
             print(e)
@@ -174,13 +191,23 @@ class UpdateLogsDBGetter(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-
-class UserDataView(APIView):
-    permission_classes = [IsAuthenticated]
-    
-    def get(self, request):
-        return Response({
-            'id': request.user.id,
-            'username': request.user.username,
-            'email': request.user.email,
-        })
+    def post(self, request):
+        user_id = request.data.get("userID")
+        datetime = request.data.get("start_time", None)
+        if datetime:
+            tasks = SimulationInstance.objects.get(
+                userID=user_id,
+                datetime=datetime,
+            )
+            return Response(
+                tasks.qa_blocks, 
+                status=status.HTTP_200_OK,
+            )
+        else:
+            tasks = SimulationInstance.objects.filter(userID=user_id)
+            return Response([{
+                    "datetime": t.datetime,
+                    "mark": sum(sample["mark"] for sample in t.qa_blocks) / len(t.qa_blocks),
+                } for t in tasks if len(t.qa_blocks) > 0],
+                status=status.HTTP_200_OK,
+            )

@@ -1,0 +1,60 @@
+#login {
+    background-color: #2A2A2A;
+    padding: 40px;
+    border-radius: 20px;
+    text-align: center;
+    width: 300px;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.input-button {
+    background-color: #454545;
+    border: none;
+    border-radius: 50px;
+    color: white;
+    font-family: 'Consolas', monospace;
+    font-size: 18px;
+    padding: 10px 20px;
+    text-align: center;
+    cursor: pointer;
+    margin-top: 20px;
+    transition: background-color 0.3s;
+    width: 100%;
+}
+
+.button:hover {
+    background-color: #5a5a5a;
+}
+
+.small_text {
+    color: white;
+    font-family: 'Consolas', monospace;
+    font-size: 20px;
+    text-align: left;
+}
+
+.input-field {
+    width: 100%;
+    padding: 8px;
+    margin-top: 5px;
+    margin-bottom: 5px;
+    box-sizing: border-box;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 16px;
+}
+
+.error {
+    color: red;
+    margin-top: 15px;
+}
+
+.text {
+    color: white;
+    font-family: 'Consolas', monospace;
+    font-size: 24px;
+    margin-bottom: 20px;
+}

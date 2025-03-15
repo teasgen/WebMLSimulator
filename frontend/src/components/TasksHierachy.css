@@ -7,7 +7,16 @@
   box-sizing: border-box;
   overflow-y: auto;
 }
-  
+
+.left-panel {
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.topics-list {
+  padding-left: 10px;
+}
+
 .main-content {
   display: flex;
   gap: 20px;

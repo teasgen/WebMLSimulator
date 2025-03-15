@@ -8,6 +8,7 @@ import { useNavigateToMenu } from './common';
 
 const Simulation = () => {
   const [startTime, setStartTime] = useState(new Date().toISOString());
+  const [statusText, setStatusText] = useState("Starting");
 
   const navigateToMenu = useNavigateToMenu();
   const navigate = useNavigate();
@@ -17,7 +18,7 @@ const Simulation = () => {
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
   const streamRef = useRef(null);
-
+  
   const [intervalSeconds, setIntervalSeconds] = useState(0);
   const [sessionSeconds, setSessionSeconds] = useState(0);
 
@@ -31,9 +32,10 @@ const Simulation = () => {
   const sessionTimerIntervalRef = useRef(null);
   const sessionTimerDisplayRef = useRef(null);
   const isSessionTimerRunningRef = useRef(false);
-  const maxSessionDuration = 500;
+  const maxSessionDuration = 10;
 
-  const [interviewText, setInterviewText] = useState('Generating new question...');
+  const [interviewText, setInterviewText] = useState('');
+  const themeSessionDuration = useRef(0);
   const [answerText, setAnswerText] = useState('');
   const interviewTextRef = useRef(interviewText);
   const answerTextRef = useRef(answerText);
@@ -120,7 +122,7 @@ const Simulation = () => {
     stopSessionTimer();
     stopTimer();
     setTimeout(() => {
-      navigate("/menu"); // Move to the intended page after stopping everything
+      navigateToHistory();
     }, 0);
   };
 
@@ -130,6 +132,7 @@ const Simulation = () => {
         const themesData = await getThemes();
         themesRef.current = themesData;
         console.log(themesRef.current.themes[0])
+        setStatusText('Generating first question...');
         await sendQuestionGenerationToServer(themesRef.current.themes[0]);
         themesRef.current.themes = themesRef.current.themes.slice(1);
       } catch (error) {
@@ -139,8 +142,8 @@ const Simulation = () => {
     const videoElement = videoRef.current;
     let stream = null;
     let mediaRecorder = null;
-
     fetchThemes().then(() => {
+      setStatusText('Answer!');
       const startMedia = async () => {
         try {
           stream = await navigator.mediaDevices.getUserMedia({
@@ -234,12 +237,8 @@ const Simulation = () => {
       console.log("llm_answer: ", llm_answer)
       let mark = llm_answer["mark"]
       const validation_system_comment = llm_answer["comment"]
-      // check should we generate new questiom
-      if (mark >= 8) {
-        await sendQuestionGenerationToServer(themesRef.current.themes[0]);
-        themesRef.current.themes = themesRef.current.themes.slice(1);
-      }
       await sendUpdateLogsDBToServer(old_question, text_answer, audio_transcription[0], validation_system_comment, mark)
+      setStatusText('Answer!');
       await startAudioRecording();
     } catch (error) {
       console.error('Error in handleFinishQABlock:', error);
@@ -298,7 +297,8 @@ const Simulation = () => {
   };
 
   const handleValidationLLMStreamingResponse = async (prompt) => {
-    setInterviewText('Validating answer...');
+    setStatusText('Validating answer...');
+    themeSessionDuration.current += 1;
 
     let localInterviewText = '';
     let localRating = '';
@@ -359,11 +359,17 @@ const Simulation = () => {
                     }
                     else if (current_key === "Комментарий проверяющей системы") {
                       localSystemComment += cur + " ";
+                      setStatusText('Time to think...');
                     }
                     else if (current_key === "Оценка") {
                       localRating = parseFloat(cur);
-                      if (localRating > 8)
+                      if (localRating > 8 || themeSessionDuration.current >= 5) {
+                        sendQuestionGenerationToServer(themesRef.current.themes[0]);
+                        themesRef.current.themes = themesRef.current.themes.slice(1);
                         new_question_doesnt_required = true;
+                        themeSessionDuration.current = 0;
+                        setStatusText('Time to think...');
+                      }
                     }            
                 }
             }
@@ -403,7 +409,7 @@ const Simulation = () => {
   const sendQuestionToServer = async (question, answer_text, answer_audio) => {
     const prompt = {
       "prompt": "{" + "\"Вопрос\": " + question + ", \"Ответ пользователя\": " + answer_audio + ". " + answer_text + "}",
-      "use_validation_system_prompt": true,
+      "system_prompt_type": 0,
     };
 
     console.log("send answer to server")
@@ -415,7 +421,7 @@ const Simulation = () => {
     setInterviewText('Generating new question...');
     const prompt = {
       "prompt": "Придумай строго один теоретический вопрос по машинному обучению по теме " + theme,
-      "use_validation_system_prompt": false,
+      "system_prompt_type": -1,
     };
 
     console.log("send answer to server")
@@ -438,11 +444,27 @@ const Simulation = () => {
     await updateLogsDB(QABlock);
   };
 
+  const sendEndedSessionToServer = async (question, answer_text, answer_audio, validation_system_comment, mark) => {
+    const body = {"is_ended": true};
+    console.log("is_ended");
+    await updateLogsDB(body);
+  };
+
+  const navigateToHistory = () => {
+    sendEndedSessionToServer().then(
+      navigate("/single-history", {
+        state: {
+          startTime: startTime, 
+        }
+      })
+    );
+  };
+
   return (
     <div className="body">
       <div className="main-content">
         <div className="left-panel">
-          <h2 className="text">Интервьюер</h2>
+          <h2 className="text">{statusText}</h2>
           <textarea
             className="input-textarea"
             value={interviewText}

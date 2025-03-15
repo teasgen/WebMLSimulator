@@ -1,0 +1,68 @@
+.container {
+  background-color: #121212;
+  width: 100vw;
+  height: 100vh;
+  padding: 20px;
+  color: white;
+  box-sizing: border-box;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+  align-items: center;
+  width: 100%;
+  max-width: 800px;
+}
+
+.history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background-color: #2A2A2A;
+  border-radius: 50px;
+  padding: 15px 30px;
+}
+
+.history-text {
+  color: white;
+  font-family: 'Consolas', monospace;
+  font-size: 24px;
+}
+
+.mark-circle {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  font-family: 'Consolas', monospace;
+  color: white;
+}
+
+.to-menu-button {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  padding: 15px 30px;
+  background-color: #DBCD72;
+  border: none;
+  border-radius: 25px;
+  color: black;
+  font-size: 1.2em;
+  cursor: pointer;
+  font-family: 'Consolas', monospace;
+}

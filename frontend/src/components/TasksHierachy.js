@@ -72,24 +72,26 @@ function App() {
 
   return (
     <div className='container'>
-      <ol>
-        {sortedTopics.map((topic, index) => (
-          <li key={index} className='middle-text'>
-            <h3 onClick={() => toggleTopic(index)}>
-              {topic.title}
-            </h3>
-            {expandedTopic === index && (
-              <ul>
-                {topic.tasks.map((taskData, taskIndex) => (
-                  <li className='small-text' key={taskIndex} onClick={() => navigateToTask(topic.title, taskData)}>
-                    {taskData.task}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </li>
-        ))}
-      </ol>
+      <div className="left-panel">
+        <ol className='topics-list'>
+          {sortedTopics.map((topic, index) => (
+            <li key={index} className='middle-text'>
+              <h3 onClick={() => toggleTopic(index)}>
+                {topic.title}
+              </h3>
+              {expandedTopic === index && (
+                <ul>
+                  {topic.tasks.map((taskData, taskIndex) => (
+                    <li className='small-text' key={taskIndex} onClick={() => navigateToTask(topic.title, taskData)}>
+                      {taskData.task}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          ))}
+        </ol>
+      </div>
       <button className="to-menu-button" onClick={navigateToMenu}>
         Вернуться в меню
       </button>

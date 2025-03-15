@@ -18,13 +18,43 @@ function App() {
     navigate("/practice");
   };
 
-  const validateAnswer = () => {
-    const data = {"prompt": "Вопрос: " + taskText + "\nОтвет: " + answerText};
+  const handleValidationLLMStreamingResponse = async (prompt) => {
+    setSystemAnswer('Validating answer...');
 
-    getLLMResponse(data)
-      .then((answer) => { 
-        setSystemAnswer(answer.message);
-      })
+    let localInterviewText = '';
+    try {
+      const reader = await getLLMResponse(prompt);
+      const decoder = new TextDecoder('utf-8');
+  
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        let current_str = decoder.decode(value, { stream: true }).trim();
+        if (current_str.includes("<|im_end|>"))
+            current_str = current_str.slice(0, current_str.indexOf("<|im_end|>"))
+        console.log(current_str, current_str.includes("Комментарий"))
+        if (current_str.includes("Комментарий"))
+          current_str = "\n\n" + current_str;
+        current_str = current_str.replace("{", "").replace("}", "").replace(/"/g, "");
+        localInterviewText += current_str + " ";
+        setSystemAnswer(localInterviewText);
+      }
+      return { "interviewText": localInterviewText};
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    }
+  };
+
+  const validateAnswer = async () => {
+    const data = {
+      "prompt": "{" + "\"Вопрос\": " + taskText + ", \"Ответ пользователя\": " + answerText + "}",
+      "system_prompt_type": 1,
+    };
+
+    console.log("send answer to server")
+    const result = await handleValidationLLMStreamingResponse(data);
+    return { "answer": result.interviewText };
   };
 
   return (
@@ -36,7 +66,7 @@ function App() {
             className="input-textarea"
             value={answerText}
             onChange={(e) => setAnswerText(e.target.value)}
-            rows={30}
+            rows={20}
             placeholder="Bla-bla"
           />
 
@@ -44,7 +74,7 @@ function App() {
           <textarea
             className="input-textarea"
             value={systemAnswer}
-            rows={10}
+            rows={20}
             placeholder="Bla-bla"
             readOnly
           />

@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { NavLink, Routes, Route } from 'react-router';
+import AuthContext from '../context/AuthContext';
 import '../themes/dark.css';
+import './Menu.css'
 
 function CreateMenu() {
   const buttons = [
@@ -25,7 +27,15 @@ function CreateMenu() {
   );
 }
 
+
 function Menu() {
+  const { logoutUser } = useContext(AuthContext);
+
+  const handleLogout = async () => {
+    logoutUser();
+    window.location.href = "/login";
+  };
+
   return (
     <div>
       <CreateMenu />
@@ -35,6 +45,9 @@ function Menu() {
         <Route path="/history" element={<div>History</div>} />
         <Route path="/recommendations" element={<div>Recommendations</div>} />
       </Routes>
+      <button className="logout-button" onClick={handleLogout}>
+        Выйти
+      </button>
     </div>
   );
 }

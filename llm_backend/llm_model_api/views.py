@@ -23,24 +23,30 @@ class ValidateAnswer(APIView):
 8 - пользователь ответил на вопрос, указал верные факты, неточностей быть не должно. Однако ответ требует дополнений - примеров, все важные аспекты должны быть упомянуты
 9 - пользователь ответил на вопрос, указал верные факты, неточностей быть не должно. Ответ точен и полон, все важные аспекты должны быть упомянуты, ответ расширает вопрос, а не отвечает напрямую
 10 - пользователь ответил на вопрос полностью корректно, дополнений быть не может. Идеальный ответ.
-При неполном ответе придумай вопрос с уточнением и напиши его. Если ответ на 10, то можешь придумать дополнительный вопрос. Ответ должен быть в json формате с полями 'Оценка', 'Новый вопрос', 'Комментарий проверяющей системы' в строго указанном порядке\n"""
+При неполном ответе придумай вопрос с уточнением и напиши его. Если ответ на 10, то можешь придумать дополнительный вопрос. Ответ должен быть в json формате с полями {} в строго указанном порядке\n"""
 
     def post(self, request, format=None):
         serializer = LLMSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         prompt = serializer.validated_data['prompt']
-        use_validation_system_prompt = serializer.validated_data['use_validation_system_prompt']
+        system_prompt_type = serializer.validated_data.get('system_prompt_type', 0)
+        if system_prompt_type == -1:
+            formatted_system_prompt = ""
+        elif system_prompt_type == 0:
+            formatted_system_prompt = self.system_prompt.format("'Оценка', 'Новый вопрос', 'Комментарий проверяющей системы'")
+        elif system_prompt_type == 1:
+            formatted_system_prompt = self.system_prompt.format("'Оценка', 'Комментарий проверяющей системы'")
 
         app_config = apps.get_app_config('llm_model_api')
         model = app_config.model
         tokenizer = app_config.tokenizer
 
         messages = [
-            {"role": "system", "content": self.system_prompt if use_validation_system_prompt else ""},
+            {"role": "system", "content": formatted_system_prompt},
             {"role": "user", "content": prompt}
         ]
-        print(f"get: {prompt}")
+        print(f"get: {prompt, formatted_system_prompt}")
         inputs = tokenizer.apply_chat_template(
             messages,
             tokenize = True,
