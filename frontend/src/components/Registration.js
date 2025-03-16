@@ -18,7 +18,6 @@ const Register = () => {
       return;
     }
     
-    console.log(registerUser);
     const result = await registerUser(email, password);
     if (result.success) {
       navigate('/login');
@@ -33,7 +32,7 @@ const Register = () => {
 
   return (
     <div id="login">
-      <div className="text">Регистрация</div>
+      <div className="login-text">Регистрация</div>
       {error && <p>{error}</p>}
       <form onSubmit={handleSubmit}>
         <div>

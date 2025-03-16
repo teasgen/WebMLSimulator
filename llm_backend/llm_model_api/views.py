@@ -55,7 +55,7 @@ class ValidateAnswer(APIView):
         ).to("mps")
 
         text_streamer = TextIteratorStreamer(tokenizer, skip_prompt = True)
-        generation_kwargs = dict(input_ids=inputs, streamer=text_streamer, max_new_tokens=512)
+        generation_kwargs = dict(input_ids=inputs, streamer=text_streamer, max_new_tokens=512, temperature = 1.5, min_p = 0.1)
         thread = Thread(target=model.generate, kwargs=generation_kwargs)
         thread.start()
 

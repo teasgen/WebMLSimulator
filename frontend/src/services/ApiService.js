@@ -64,27 +64,9 @@ export const getLogsDB = async (data) => {
     return fetchWithAuth("/logs-db/", "POST", data);
 };
 
-// export const updateLogsDB = async (data) => {
-//     const response = await fetch("http://127.0.0.1:8000/logs-db/", {
-//         method: "PATCH",
-//         headers: {
-//             "Content-Type": "application/json",
-//         },
-//         body: JSON.stringify(data),
-//     });
-//     return await response.json();
-// };
-
-// export const getLogsDB = async (data) => {
-//     const response = await fetch("http://127.0.0.1:8000/logs-db/", {
-//         method: "POST",
-//         headers: {
-//             "Content-Type": "application/json",
-//         },
-//         body: JSON.stringify(data),
-//     });
-//     return await response.json();
-// };
+export const getStatsLogsDB = async (data) => {
+    return fetchWithAuth("/stats-logs-db/", "POST", data);
+};
 
 export const getThemes = async () => {
     const response = await fetch(`${API_BASE_URL}/interview-themes/`, {

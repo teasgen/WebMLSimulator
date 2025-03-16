@@ -1,7 +1,7 @@
 from django.urls import include, path  
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
-from .views import ThemesGeneration, AudioGetter, TasksGetter, LLMResponseGetter, LogsDB
+from .views import ThemesGeneration, AudioGetter, TasksGetter, LLMResponseGetter, LogsDB, StaticticsLogsDB
 
 urlpatterns = [
     path('interview-themes/', ThemesGeneration.as_view() ),
@@ -9,4 +9,5 @@ urlpatterns = [
     path('tasks-getter/', TasksGetter.as_view() ),
     path('generate-question/', LLMResponseGetter.as_view() ),
     path('logs-db/', LogsDB.as_view() ),
+    path('stats-logs-db/', StaticticsLogsDB.as_view() ),
 ]

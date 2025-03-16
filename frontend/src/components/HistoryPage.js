@@ -1,14 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext, useRef } from 'react';
 import { useLocation } from "react-router";
 import { getLogsDB } from "../services/ApiService";
 import { useNavigateToMenu } from './common';
+import AuthContext from '../context/AuthContext';
 import './Simulation.css';
 import './HistoryPage.css';
 import '../themes/dark.css';
 
 function SingleHistory() {
+  const { user } = useContext(AuthContext);
   const location = useLocation();
   const { startTime } = location.state || {};
+  const uniqueThemes = useRef(null);
 
   const [results, setResults] = useState([]);
   const [averageMark, setAverageMark] = useState(0);
@@ -17,13 +20,16 @@ function SingleHistory() {
   useEffect(() => {
     const fetchData = async () => {
         const data = await getLogsDB({
-            "userID": 0,
+            "userID": user ? user.id : 0,
             "start_time": startTime,
         });
         setResults(data);
 
         const sum = data.reduce((acc, item) => acc + item.mark, 0);
-        setAverageMark((sum / data.length).toFixed(1));
+        setAverageMark((sum / data.length).toFixed(1).trim());
+
+        const uniqueThemesSet = new Set(data.map(item => item.theme));
+        uniqueThemes.current = Array.from(uniqueThemesSet);
     };
     fetchData();
   }, []);
@@ -35,7 +41,7 @@ function SingleHistory() {
           <div className="header-section">
             <h1 className="text">История собеседования</h1>
           </div>
-          
+
           <div className="results-container">
             {results.map((item, index) => (
               <div className="result-tile" key={index}>
@@ -70,9 +76,9 @@ function SingleHistory() {
             <div className="topics-section">
               <h3 className="small_text">Затронутые темы</h3>
               <ul className="small_text">
-                <li>Решающие деревья</li>
-                <li>Линейная регрессия</li>
-                <li>Логистическая регрессия</li>
+                {uniqueThemes.current && uniqueThemes.current.map((item, i) => (
+                  <li key={i}>{item}</li>
+                ))}
               </ul>
             </div>
           </div>

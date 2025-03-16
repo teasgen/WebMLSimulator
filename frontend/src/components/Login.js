@@ -27,7 +27,7 @@ const Login = () => {
 
   return (
     <div id="login">
-      <div className="text">Вход</div>
+      <div className="login-text">Вход</div>
       {error && <p className="error">{error}</p>}
       <form onSubmit={handleSubmit}>
         <div className="form-group">

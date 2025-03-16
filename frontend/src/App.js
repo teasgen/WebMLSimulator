@@ -9,6 +9,7 @@ import History from './components/FullHistoryPage';
 import Test from "./components/Test";
 import Login from "./components/Login";
 import Register from "./components/Registration";
+import Recommendations from './components/Recommendations';
 
 
 function App() {
@@ -24,6 +25,7 @@ function App() {
           <Route path="/history" element={<History />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/recommendations" element={<Recommendations />} />
           <Route path="/test" element={<Test />} />
         </Routes>
       </div>

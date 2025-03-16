@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useRef } from 'react';
 import { useNavigate } from "react-router";
 import { getLogsDB } from "../services/ApiService";
 import { useNavigateToMenu } from './common';
@@ -19,6 +19,8 @@ function History() {
         const data = await getLogsDB({
             "userID": user ? user.id : 0,
         });
+        console.log(data)
+        data.sort((a, b) => new Date(b["datetime"]) - new Date(a["datetime"]));
         setHistories(data);
     };
     if (user) {
@@ -41,21 +43,21 @@ function History() {
       const month = String(date.getMonth() + 1).padStart(2, '0');
       const day = String(date.getDate()).padStart(2, '0');
       
-      const hours = String(date.getHours()).padStart(2, '0');
+      const hours = String(date.getHours() - 3).padStart(2, '0');
       const minutes = String(date.getMinutes()).padStart(2, '0');
       
       // Format as "YYYY-MM-DD HH:MM"
       return `${year}-${month}-${day} ${hours}:${minutes}`;
     } catch (error) {
       console.error("Error formatting date:", error);
-      return dateString; // Return the original string if parsing fails
+      return dateString;
     }
   };
 
   const navigateToHistory = (datetime) => {
     navigate("/single-history", {
       state: {
-        startTime: datetime, 
+        startTime: datetime,
       }
     });
   };

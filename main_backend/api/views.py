@@ -1,6 +1,7 @@
 import os
 import requests
 import logging
+from collections import defaultdict
 from random import shuffle
 
 from rest_framework import status, generics
@@ -71,8 +72,8 @@ class AudioGetter(APIView):
                 raise RuntimeError(transription.reason)
 
             return Response({
-                'message': transription,
-            }, status=status.HTTP_201_CREATED)
+                'message': transription.content.decode("utf-8"),
+            }, status=status.HTTP_200_OK)
 
         except Exception as e:
             print(e)
@@ -144,8 +145,10 @@ class LogsDB(APIView):
     def patch(self, request):
         try:
             data = request.data
+            print(data)
             if data.get("is_ended") is None:
                 current_qa_block = {
+                    "theme": data.get("theme"),
                     "question": data.get("question"),
                     "answer": data.get("answer"),
                     "comment": data.get("comment"),
@@ -153,7 +156,7 @@ class LogsDB(APIView):
                 }
 
                 naive_datetime = parse_datetime(data.get("start_time"))
-                datetime = naive_datetime.replace(tzinfo=ZoneInfo("Etc/GMT-3"))
+                datetime = naive_datetime.replace(tzinfo=ZoneInfo("Etc/GMT+3"))
 
                 instance, _ = SimulationInstance.objects.get_or_create(
                     userID=data.get("userID"),
@@ -170,9 +173,9 @@ class LogsDB(APIView):
                 )
             else:
                 naive_datetime = parse_datetime(data.get("start_time"))
-                datetime = naive_datetime.replace(tzinfo=ZoneInfo("Etc/GMT-3"))
+                datetime = naive_datetime.replace(tzinfo=ZoneInfo("Etc/GMT+3"))
 
-                instance, _ = SimulationInstance.objects.get(
+                instance = SimulationInstance.objects.get(
                     userID=data.get("userID"),
                     datetime=datetime,
                 )
@@ -195,6 +198,8 @@ class LogsDB(APIView):
         user_id = request.data.get("userID")
         datetime = request.data.get("start_time", None)
         if datetime:
+            naive_datetime = parse_datetime(datetime)
+            datetime = naive_datetime.replace(tzinfo=ZoneInfo("Etc/GMT+3"))
             tasks = SimulationInstance.objects.get(
                 userID=user_id,
                 datetime=datetime,
@@ -206,8 +211,36 @@ class LogsDB(APIView):
         else:
             tasks = SimulationInstance.objects.filter(userID=user_id)
             return Response([{
-                    "datetime": t.datetime,
+                    "datetime": t.datetime.astimezone(ZoneInfo("Etc/GMT+3")),
                     "mark": sum(sample["mark"] for sample in t.qa_blocks) / len(t.qa_blocks),
                 } for t in tasks if len(t.qa_blocks) > 0],
                 status=status.HTTP_200_OK,
             )
+
+class StaticticsLogsDB(APIView):
+    # permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user_id = request.data.get("userID")
+        task_name = request.data.get("task_name")
+        simulations = SimulationInstance.objects.filter(userID=user_id)
+        if task_name == "recommendations":
+            themes = defaultdict(list)
+            for simulation in simulations:
+                for block in simulation.qa_blocks:
+                    themes[block["theme"]].append(block["mark"])
+            marks = [(sum(mark) / len(mark), theme) for theme, mark in themes.items()]
+            marks.sort(key=lambda tup: tup[0])
+            print(marks)
+            return Response(marks[:5], status=status.HTTP_200_OK)
+        elif task_name == "graphic":
+            datetimes = defaultdict(list)
+            for simulation in simulations:
+                for block in simulation.qa_blocks:
+                    datetimes[simulation.datetime.strftime("%Y-%m-%d")].append(block["mark"])
+            marks = [(sum(mark) / len(mark), day) for day, mark in datetimes.items()]
+            marks.sort(key=lambda tup: tup[1]) # sort by day
+            print(marks)
+            return Response(marks[:5], status=status.HTTP_200_OK)
+        else:
+            return Response({"error:", "Unsupported task name"}, status=status.HTTP_400_BAD_REQUEST)

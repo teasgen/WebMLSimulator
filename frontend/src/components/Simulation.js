@@ -1,5 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useContext } from 'react';
 import { useNavigate } from "react-router";
+import AuthContext from '../context/AuthContext';
 import './Simulation.css';
 import '../themes/dark.css';
 
@@ -9,6 +10,7 @@ import { useNavigateToMenu } from './common';
 const Simulation = () => {
   const [startTime, setStartTime] = useState(new Date().toISOString());
   const [statusText, setStatusText] = useState("Starting");
+  const { user } = useContext(AuthContext);
 
   const navigateToMenu = useNavigateToMenu();
   const navigate = useNavigate();
@@ -26,19 +28,21 @@ const Simulation = () => {
   const timerRef = useRef(null);
   const isTimerRunningRef = useRef(false);
   const timerIntervalRef = useRef(null);
-  const maxDuration = 10;
+  const maxDuration = 30;
 
   // session timer
   const sessionTimerIntervalRef = useRef(null);
   const sessionTimerDisplayRef = useRef(null);
   const isSessionTimerRunningRef = useRef(false);
-  const maxSessionDuration = 10;
+  const maxSessionDuration = 100;
 
   const [interviewText, setInterviewText] = useState('');
   const themeSessionDuration = useRef(0);
   const [answerText, setAnswerText] = useState('');
   const interviewTextRef = useRef(interviewText);
   const answerTextRef = useRef(answerText);
+
+  const currentTheme = useRef(null);
 
   useEffect(() => {
     interviewTextRef.current = interviewText;
@@ -134,6 +138,7 @@ const Simulation = () => {
         console.log(themesRef.current.themes[0])
         setStatusText('Generating first question...');
         await sendQuestionGenerationToServer(themesRef.current.themes[0]);
+        currentTheme.current = themesRef.current.themes[0];
         themesRef.current.themes = themesRef.current.themes.slice(1);
       } catch (error) {
         console.error("Error during themes getting process:", error);
@@ -232,12 +237,12 @@ const Simulation = () => {
       const text_answer = answerTextRef.current;   
       console.log("old_question: ", old_question)
       console.log("text_answer: ", text_answer)
-      console.log("audio_transcription: ", audio_transcription[0])
+      console.log("audio_transcription: ", audio_transcription)
       const llm_answer = await sendQuestionToServer(old_question, text_answer, audio_transcription);
       console.log("llm_answer: ", llm_answer)
       let mark = llm_answer["mark"]
       const validation_system_comment = llm_answer["comment"]
-      await sendUpdateLogsDBToServer(old_question, text_answer, audio_transcription[0], validation_system_comment, mark)
+      await sendUpdateLogsDBToServer(old_question, text_answer, audio_transcription, validation_system_comment, mark)
       setStatusText('Answer!');
       await startAudioRecording();
     } catch (error) {
@@ -277,12 +282,17 @@ const Simulation = () => {
         formData.append('audio', audioBlob, 'recording.wav');
         console.log("send audio to server")
   
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
+
         const response = await fetch('http://127.0.0.1:8000/audio-getter/', {
           method: 'POST',
           body: formData,
+          signal: controller.signal,
         });
   
         if (!response.ok) {
+          console.log(response)
           throw new Error('Network response was not ok');
         }
   
@@ -365,6 +375,7 @@ const Simulation = () => {
                       localRating = parseFloat(cur);
                       if (localRating > 8 || themeSessionDuration.current >= 5) {
                         sendQuestionGenerationToServer(themesRef.current.themes[0]);
+                        currentTheme.current = themesRef.current.themes[0];
                         themesRef.current.themes = themesRef.current.themes.slice(1);
                         new_question_doesnt_required = true;
                         themeSessionDuration.current = 0;
@@ -430,13 +441,15 @@ const Simulation = () => {
   };
 
   const sendUpdateLogsDBToServer = async (question, answer_text, answer_audio, validation_system_comment, mark) => {
+    console.log(user, user.id)
     const QABlock = {
-      "userID": "0",
+      "userID": user ? user.id : 0,
       "start_time": startTime,
       "question": question,
       "answer": answer_audio + "\n" + answer_text,
       "comment": validation_system_comment,
       "mark": mark,
+      "theme": currentTheme.current,
     };
     console.log(QABlock);
 
@@ -444,8 +457,12 @@ const Simulation = () => {
     await updateLogsDB(QABlock);
   };
 
-  const sendEndedSessionToServer = async (question, answer_text, answer_audio, validation_system_comment, mark) => {
-    const body = {"is_ended": true};
+  const sendEndedSessionToServer = async () => {
+    const body = {
+      "userID": user ? user.id : 0,
+      "start_time": startTime,
+      "is_ended": true,
+    };
     console.log("is_ended");
     await updateLogsDB(body);
   };

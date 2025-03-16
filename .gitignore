@@ -6,7 +6,7 @@ frontend/node_modules
 
 # temporary data
 *.wav
-*.wepm
+*.webm
 *.csv
 *.tar
 *.DS_Store
