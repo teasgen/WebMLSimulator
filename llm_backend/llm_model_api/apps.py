@@ -6,7 +6,7 @@ from django.apps import AppConfig
 
 class LLMModelApiConfig(AppConfig):
     name = 'llm_model_api'
-    path = "/Users/teasgen/workspace/diploma/llm_backend/lora_model_mark_answer_comment_first_system_prompt"
+    path = "llm_backend/lora_model_mark_answer_comment_first_system_prompt"
 
     def ready(self):
         self.model = AutoPeftModelForCausalLM.from_pretrained(
