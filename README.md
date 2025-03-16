@@ -1,6 +1,6 @@
 # WebMLSimulator
 
-In this repository located Wweb application for prepraring ML engineers for the interviews.
+This repository contains a web application for preparing ML engineers for the interviews.
 
 There are 4 services:
 - frontend - React JS service which contains all components for communication with user
