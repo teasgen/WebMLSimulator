@@ -13,16 +13,25 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const success = await loginUser(email, password);
-    if (success) {
+    const result = await loginUser(email, password);
+    console.log(result);
+    if (result === true) {
+      console.log('Login successful, navigating to menu');
       navigate('/menu');
+    } else if (result && result.error === 'email_unverified') {
+      setError('Email is not verified');
     } else {
+      console.log('Login failed, showing error message');
       setError('Invalid credentials. Please try again.');
     }
   };
 
   const handleRegister = () => {
     window.location.href = "/register";
+  };
+
+  const handleForgotPassword = () => {
+    window.location.href = "/forgot-password";
   };
 
   return (
@@ -56,6 +65,9 @@ const Login = () => {
       </form>
       <button className="input-button" onClick={handleRegister}>
         Регистрация
+      </button>
+      <button className="input-button" onClick={handleForgotPassword}>
+        Забыл пароль
       </button>
     </div>
   );

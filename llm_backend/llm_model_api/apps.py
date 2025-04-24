@@ -1,18 +1,12 @@
-import torch
-from peft import AutoPeftModelForCausalLM
-from transformers import AutoTokenizer
-from django.apps import AppConfig
+import queue
+from mlc_llm import MLCEngine
+
+POOL_SIZE = 2
+engine_pool = queue.Queue(maxsize=POOL_SIZE)
 
 
-class LLMModelApiConfig(AppConfig):
-    name = 'llm_model_api'
-    path = "llm_backend/lora_model_mark_answer_comment_first_system_prompt"
+model_path = "/Users/teasgen/workspace/diploma/llm_backend/lora_model_mark_answer_comment_first_system_prompt_v2/mlc_qwen2"
 
-    def ready(self):
-        self.model = AutoPeftModelForCausalLM.from_pretrained(
-            self.path,
-            torch_dtype=torch.bfloat16,
-            low_cpu_mem_usage=True,
-        ).to("mps")
-        self.tokenizer = AutoTokenizer.from_pretrained(self.path)
-        print("LLM was initialized")
+for _ in range(POOL_SIZE):
+    engine = MLCEngine(model_path)
+    engine_pool.put(engine)

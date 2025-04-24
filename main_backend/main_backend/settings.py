@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'api',
+    'users',
     'rest_framework',
     'corsheaders'
 ]
@@ -154,3 +155,16 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 AUDIO_UPLOAD_DIR = os.path.join(MEDIA_ROOT, 'audio_recordings')
 os.makedirs(AUDIO_UPLOAD_DIR, exist_ok=True)
+
+# Email configuration
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.yandex.ru'
+EMAIL_PORT = 465
+EMAIL_USE_SSL = True
+EMAIL_HOST_USER = 'vladms03@yandex.com'
+EMAIL_HOST_PASSWORD = 'dkekamfhtxeddcqg'
+SITE_URL = 'http://localhost:3003'
+
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+SERVER_EMAIL = EMAIL_HOST_USER
+EMAIL_ADMIN = EMAIL_HOST_USER

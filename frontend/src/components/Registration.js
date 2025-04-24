@@ -20,7 +20,11 @@ const Register = () => {
     
     const result = await registerUser(email, password);
     if (result.success) {
-      navigate('/login');
+      if (result.exists) {
+        setError("You are already registered!")
+      } else {
+        navigate('/login');
+      }
     } else {
       setError(
         typeof result.error === 'object' 

@@ -10,6 +10,9 @@ import Test from "./components/Test";
 import Login from "./components/Login";
 import Register from "./components/Registration";
 import Recommendations from './components/Recommendations';
+import EmailVerification from './components/email_components/EmailVerification';
+import ForgotPassword from './components/email_components/ForgotPassword';
+import ResetPassword from './components/email_components/ResetPassword';
 
 
 function App() {
@@ -26,6 +29,9 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/recommendations" element={<Recommendations />} />
+          <Route path="/verify-email/:token" element={<EmailVerification />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password/:token" element={<ResetPassword />} />
           <Route path="/test" element={<Test />} />
         </Routes>
       </div>

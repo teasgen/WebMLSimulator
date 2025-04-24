@@ -1,7 +1,8 @@
 const API_BASE_URL = "http://127.0.0.1:8000";
 
 export const getLLMResponse = async (prompt) => {
-    const response = await fetch(`${API_BASE_URL}/generate-question/`, {
+    // const response = await fetch(`http://127.0.0.1:3002/validate/`, {
+        const response = await fetch(`${API_BASE_URL}/generate-question/`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'

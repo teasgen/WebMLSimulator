@@ -11,6 +11,7 @@ const Simulation = () => {
   const [startTime, setStartTime] = useState(new Date().toISOString());
   const [statusText, setStatusText] = useState("Starting");
   const { user } = useContext(AuthContext);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const navigateToMenu = useNavigateToMenu();
   const navigate = useNavigate();
@@ -28,7 +29,7 @@ const Simulation = () => {
   const timerRef = useRef(null);
   const isTimerRunningRef = useRef(false);
   const timerIntervalRef = useRef(null);
-  const maxDuration = 30;
+  const maxDuration = 60;
 
   // session timer
   const sessionTimerIntervalRef = useRef(null);
@@ -198,6 +199,7 @@ const Simulation = () => {
   }, []);
 
   const handleFinishQABlock = async () => {
+    setIsSubmitting(true);
     if (!isTimerRunningRef.current) return;
     isTimerRunningRef.current = false;
     stopTimer();
@@ -245,6 +247,7 @@ const Simulation = () => {
       await sendUpdateLogsDBToServer(old_question, text_answer, audio_transcription, validation_system_comment, mark)
       setStatusText('Answer!');
       await startAudioRecording();
+      setIsSubmitting(false);
     } catch (error) {
       console.error('Error in handleFinishQABlock:', error);
     }
@@ -519,7 +522,7 @@ const Simulation = () => {
             00:00
           </div>
 
-          <button className="submit-button" onClick={handleFinishQABlock}>
+          <button className="submit-button" onClick={handleFinishQABlock} disabled={isSubmitting}>
             Завершить ответ
           </button>
         </div>

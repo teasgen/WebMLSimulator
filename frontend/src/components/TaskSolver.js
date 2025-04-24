@@ -11,6 +11,7 @@ function App() {
   const { topicTitle, taskText, gtTaskAnswer } = location.state || {};
   const [answerText, setAnswerText] = useState('');
   const [systemAnswer, setSystemAnswer] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const navigate = useNavigate();
 
@@ -47,6 +48,7 @@ function App() {
   };
 
   const validateAnswer = async () => {
+    setIsSubmitting(true);
     const data = {
       "prompt": "{" + "\"Вопрос\": " + taskText + ", \"Ответ пользователя\": " + answerText + "}",
       "system_prompt_type": 1,
@@ -54,6 +56,7 @@ function App() {
 
     console.log("send answer to server")
     const result = await handleValidationLLMStreamingResponse(data);
+    setIsSubmitting(false);
     return { "answer": result.interviewText };
   };
 
@@ -81,7 +84,7 @@ function App() {
         </div>
 
         <div className="button-panel">
-          <button className="submit-button" onClick={validateAnswer}>
+          <button className="submit-button" onClick={validateAnswer} disabled={isSubmitting}>
             Отправить
           </button>
           <button className="submit-button" onClick={navigateToTasks}>

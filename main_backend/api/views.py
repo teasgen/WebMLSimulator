@@ -87,7 +87,7 @@ class LLMResponseGetter(APIView):
     """
     API view that proxies requests to the ValidateAnswer service and streams the response.
     """
-    
+
     def post(self, request, format=None):
         prompt = request.data.get('prompt', '')
         system_prompt_type = request.data.get('system_prompt_type', 0)
@@ -102,7 +102,7 @@ class LLMResponseGetter(APIView):
         }
 
         validate_answer_url = getattr(settings, 'VALIDATE_ANSWER_URL')
-        
+
         def stream_response():
             try:
                 with requests.post(validate_answer_url, json=data, stream=True, timeout=120) as response:
@@ -114,7 +114,7 @@ class LLMResponseGetter(APIView):
                     buffer = b""
                     for chunk in response.iter_content(chunk_size=1):
                         if chunk:
-                            if chunk == b'\n':
+                            if chunk == b' ':
                                 print(f"Sending: {buffer.decode('utf-8', errors='replace')}")
                                 yield buffer + b'\n'
                                 buffer = b""
@@ -134,10 +134,14 @@ class LLMResponseGetter(APIView):
                 print(error_msg)
                 yield error_msg
         
-        return StreamingHttpResponse(
+        response = StreamingHttpResponse(
             streaming_content=stream_response(),
             content_type='text/event-stream'
         )
+        response['Cache-Control'] = 'no-cache'
+        response['X-Accel-Buffering'] = 'no'
+        
+        return response
         
 class LogsDB(APIView):
     permission_classes = [IsAuthenticated]
@@ -145,7 +149,6 @@ class LogsDB(APIView):
     def patch(self, request):
         try:
             data = request.data
-            print(data)
             if data.get("is_ended") is None:
                 current_qa_block = {
                     "theme": data.get("theme"),
@@ -218,7 +221,7 @@ class LogsDB(APIView):
             )
 
 class StaticticsLogsDB(APIView):
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
         user_id = request.data.get("userID")

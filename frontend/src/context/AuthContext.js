@@ -29,24 +29,30 @@ export const AuthProvider = ({ children }) => {
     error => Promise.reject(error)
   );
 
-  const fetchUserData = async () => {
+  const fetchUserData = async (token = null) => {
     try {
-      if (!authTokens || !authTokens.access) {
+      const currentToken = token || authTokens;
+      console.log(currentToken)
+      if (!currentToken || !currentToken.access) {
         console.error('No access token available');
         setUser(null);
         return;
       }
 
       console.log('Fetching user data with token');
-      
+
       const response = await axios.get('http://localhost:8000/api/users/me/', {
         headers: {
-          'Authorization': `Bearer ${authTokens.access}`
+          'Authorization': `Bearer ${currentToken.access}`
         }
       });
       
       console.log('User data received');
+      if (!response.data.email_verified) {
+        throw new Error('Email was not verified');
+      }
       setUser(response.data);
+      return true;
     } catch (error) {
       console.error('Error fetching user data:', error);
       
@@ -59,6 +65,7 @@ export const AuthProvider = ({ children }) => {
           logoutUser();
         }
       }
+      return error.message;
     }
   };
 
@@ -68,14 +75,27 @@ export const AuthProvider = ({ children }) => {
         "username": email,
         "email": email,
         "password": password,
-      });
+      })
       
       const data = response.data;
-      setAuthTokens(data);
       localStorage.setItem('authTokens', JSON.stringify(data));
+      setAuthTokens(data);
       
-      await fetchUserData();
-      return true;
+      const result = await fetchUserData(data);
+      if (result === true)
+        return true;
+      else {
+        if (result === 'Email was not verified') {
+          localStorage.removeItem('authTokens');
+          
+          return {
+            error: 'email_unverified',
+            message: 'Your email is not verified. Please check your inbox and verify your email.'
+          };
+        }
+
+        return false;
+      }
     } catch (error) {
       console.error('Login error:', error);
       return false;
@@ -84,11 +104,26 @@ export const AuthProvider = ({ children }) => {
 
   const registerUser = async (email, password) => {
     try {
-      await axios.post('http://localhost:8000/api/users/register/', {
+      const response = await axios.post('http://localhost:8000/api/users/register/', {
         email,
         password
       });
-      return { success: true };
+        
+      const data = response.data;
+      
+      if (data.exists) {
+        return { 
+          success: true,
+          exists: true,
+          message: data.message
+        };
+      }
+      
+      return { 
+        success: true,
+        exists: false,
+        message: data.message
+      };
     } catch (error) {
       console.error('Registration error:', error);
       return { 
@@ -130,7 +165,6 @@ export const AuthProvider = ({ children }) => {
       setAuthTokens(data);
       localStorage.setItem('authTokens', JSON.stringify(data));
       
-      // Получение данных пользователя с новым токеном
       await fetchUserData();
     } catch (error) {
       console.error('Token refresh error:', error);
@@ -149,6 +183,49 @@ export const AuthProvider = ({ children }) => {
     return () => clearInterval(interval);
   }, [authTokens]);
 
+  const resendVerificationEmail = async (email) => {
+    try {
+      const response = await axios.post('http://localhost:8000/api/users/resend-verification/', { email });
+      return { success: true, message: response.data.message };
+    } catch (error) {
+      console.error('Resend verification error:', error);
+      return { 
+        success: false, 
+        error: error.response?.data?.error || 'Failed to resend verification email' 
+      };
+    }
+  };
+
+  const requestPasswordReset = async (email) => {
+    try {
+      const response = await axios.post('http://localhost:8000/api/users/password-reset-request/', { email });
+      return { success: true, message: response.data.message };
+    } catch (error) {
+      console.error('Password reset request error:', error);
+      return { 
+        success: false, 
+        error: error.response?.data?.error || 'Failed to request password reset' 
+      };
+    }
+  };
+  
+  const confirmPasswordReset = async (token, newPassword) => {
+    try {
+      const response = await axios.post('http://localhost:8000/api/users/password-reset-confirm/', {
+        token,
+        new_password: newPassword
+      });
+      return { success: true, message: response.data.message };
+    } catch (error) {
+      console.error('Password reset confirmation error:', error);
+      return { 
+        success: false, 
+        error: error.response?.data?.error || 'Failed to reset password' 
+      };
+    }
+  };
+  
+
   return (
     <AuthContext.Provider value={{
       user,
@@ -156,6 +233,9 @@ export const AuthProvider = ({ children }) => {
       loginUser,
       logoutUser,
       registerUser,
+      resendVerificationEmail,
+      requestPasswordReset, 
+      confirmPasswordReset,
       loading
     }}>
       {children}
