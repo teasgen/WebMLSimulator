@@ -144,7 +144,7 @@ class LLMResponseGetter(APIView):
         return response
         
 class LogsDB(APIView):
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
 
     def patch(self, request):
         try:
@@ -221,13 +221,16 @@ class LogsDB(APIView):
             )
 
 class StaticticsLogsDB(APIView):
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
 
     def post(self, request):
         user_id = request.data.get("userID")
         task_name = request.data.get("task_name")
+        filter_name = request.data.get("filter_name", None)
         simulations = SimulationInstance.objects.filter(userID=user_id)
+        print(user_id, task_name, filter_name)
         if task_name == "recommendations":
+            print(simulations)
             themes = defaultdict(list)
             for simulation in simulations:
                 for block in simulation.qa_blocks:
@@ -240,10 +243,17 @@ class StaticticsLogsDB(APIView):
             datetimes = defaultdict(list)
             for simulation in simulations:
                 for block in simulation.qa_blocks:
-                    datetimes[simulation.datetime.strftime("%Y-%m-%d")].append(block["mark"])
+                    if block["theme"] == filter_name:
+                        datetimes[simulation.datetime.strftime("%Y-%m-%d")].append(block["mark"])
             marks = [(sum(mark) / len(mark), day) for day, mark in datetimes.items()]
             marks.sort(key=lambda tup: tup[1]) # sort by day
             print(marks)
             return Response(marks[:5], status=status.HTTP_200_OK)
+        elif task_name == "filters":
+            themes = set()
+            for simulation in simulations:
+                for block in simulation.qa_blocks:
+                    themes.add(block["theme"])
+            return Response(themes, status=status.HTTP_200_OK)
         else:
             return Response({"error:", "Unsupported task name"}, status=status.HTTP_400_BAD_REQUEST)

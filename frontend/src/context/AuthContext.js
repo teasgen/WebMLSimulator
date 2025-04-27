@@ -16,7 +16,12 @@ export const AuthProvider = ({ children }) => {
       ? JSON.parse(localStorage.getItem('authTokens')) 
       : null
   );
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() =>
+    localStorage.getItem('user')
+      ? JSON.parse(localStorage.getItem('user'))
+      : null
+  );
+
   const [loading, setLoading] = useState(true);
 
   axios.interceptors.request.use(
@@ -52,6 +57,7 @@ export const AuthProvider = ({ children }) => {
         throw new Error('Email was not verified');
       }
       setUser(response.data);
+      localStorage.setItem('user', JSON.stringify(response.data));
       return true;
     } catch (error) {
       console.error('Error fetching user data:', error);
@@ -136,6 +142,7 @@ export const AuthProvider = ({ children }) => {
   const logoutUser = () => {
     setAuthTokens(null);
     setUser(null);
+    localStorage.removeItem('user');
     localStorage.removeItem('authTokens');
   };
 

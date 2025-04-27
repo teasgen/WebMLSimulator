@@ -17,3 +17,6 @@ frontend/node_modules
 
 # checkpoints
 *lora*
+
+# secrets
+*secrets*

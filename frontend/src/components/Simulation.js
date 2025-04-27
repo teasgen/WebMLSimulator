@@ -29,13 +29,16 @@ const Simulation = () => {
   const timerRef = useRef(null);
   const isTimerRunningRef = useRef(false);
   const timerIntervalRef = useRef(null);
-  const maxDuration = 60;
+  const maxDuration = 30;
 
   // session timer
   const sessionTimerIntervalRef = useRef(null);
   const sessionTimerDisplayRef = useRef(null);
   const isSessionTimerRunningRef = useRef(false);
-  const maxSessionDuration = 100;
+  const maxSessionDuration = 80;
+  
+  const isValidationEnded = useRef(true);
+  const validationPromiseRef = useRef(null);
 
   const [interviewText, setInterviewText] = useState('');
   const themeSessionDuration = useRef(0);
@@ -44,6 +47,7 @@ const Simulation = () => {
   const answerTextRef = useRef(answerText);
 
   const currentTheme = useRef(null);
+  const [isMicActive, setIsMicActive] = useState(false);
 
   useEffect(() => {
     interviewTextRef.current = interviewText;
@@ -55,6 +59,7 @@ const Simulation = () => {
 
   const startTimer = () => {
     setIntervalSeconds(0);
+    setIsMicActive(true);
     isTimerRunningRef.current = true;
     timerIntervalRef.current = setInterval(() => {
       setIntervalSeconds((prev) => {
@@ -73,6 +78,7 @@ const Simulation = () => {
       timerIntervalRef.current = null;
     }
     isTimerRunningRef.current = false;
+    setIsMicActive(false);
     setIntervalSeconds(0);
   };
 
@@ -126,6 +132,10 @@ const Simulation = () => {
     }
     stopSessionTimer();
     stopTimer();
+    isValidationEnded.current = false;
+    setStatusText('Time is out! Waiting validation system...');
+    setInterviewText('');
+    await handleFinishQABlock();
     setTimeout(() => {
       navigateToHistory();
     }, 0);
@@ -134,7 +144,14 @@ const Simulation = () => {
   useEffect(() => {
     const fetchThemes = async () => {
       try {
-        const themesData = await getThemes();
+        // const themesData = await getThemes();
+        const themesData = {
+            themes: [
+              "Backpropogation",
+                // "Нейронные сети",
+                // "Функции активации",
+            ]
+        };
         themesRef.current = themesData;
         console.log(themesRef.current.themes[0])
         setStatusText('Generating first question...');
@@ -199,58 +216,69 @@ const Simulation = () => {
   }, []);
 
   const handleFinishQABlock = async () => {
-    setIsSubmitting(true);
-    if (!isTimerRunningRef.current) return;
-    isTimerRunningRef.current = false;
-    stopTimer();
-
-    if (!mediaRecorderRef.current || mediaRecorderRef.current.state === 'inactive') {
-      console.warn('MediaRecorder is not active');
-      return;
+    console.log("validationPromiseRef.current: ", validationPromiseRef.current);
+    if (validationPromiseRef.current) {
+      return validationPromiseRef.current;
     }
+    validationPromiseRef.current = (async () => {
+      try {
+        setIsSubmitting(true);
+        if (!isTimerRunningRef.current) return;
+        isTimerRunningRef.current = false;
+        stopTimer();
 
-    try {
-      const audioData = await new Promise((resolve) => {
-        const chunks = [];
-        
-        const onDataAvailable = (e) => {
-          if (e.data.size > 0) {
-            chunks.push(e.data);
-          }
-        };
+        if (!mediaRecorderRef.current || mediaRecorderRef.current.state === 'inactive') {
+          console.warn('MediaRecorder is not active');
+          return;
+        }
 
-        const onStop = () => {
-          mediaRecorderRef.current.removeEventListener('dataavailable', onDataAvailable);
-          mediaRecorderRef.current.removeEventListener('stop', onStop);
-          const audioBlob = new Blob(chunks, { type: 'audio/webm' });
-          resolve(audioBlob);
-        };
+        const audioData = await new Promise((resolve) => {
+          const chunks = [];
+          
+          const onDataAvailable = (e) => {
+            if (e.data.size > 0) {
+              chunks.push(e.data);
+            }
+          };
 
-        mediaRecorderRef.current.addEventListener('dataavailable', onDataAvailable);
-        mediaRecorderRef.current.addEventListener('stop', onStop);
-        
-        mediaRecorderRef.current.requestData();
-        mediaRecorderRef.current.stop();
-      });
+          const onStop = () => {
+            mediaRecorderRef.current.removeEventListener('dataavailable', onDataAvailable);
+            mediaRecorderRef.current.removeEventListener('stop', onStop);
+            const audioBlob = new Blob(chunks, { type: 'audio/webm' });
+            resolve(audioBlob);
+          };
 
-      console.log(startTime);
-      const audio_transcription = await sendAudioToServer(audioData);
-      const old_question = interviewTextRef.current;
-      const text_answer = answerTextRef.current;   
-      console.log("old_question: ", old_question)
-      console.log("text_answer: ", text_answer)
-      console.log("audio_transcription: ", audio_transcription)
-      const llm_answer = await sendQuestionToServer(old_question, text_answer, audio_transcription);
-      console.log("llm_answer: ", llm_answer)
-      let mark = llm_answer["mark"]
-      const validation_system_comment = llm_answer["comment"]
-      await sendUpdateLogsDBToServer(old_question, text_answer, audio_transcription, validation_system_comment, mark)
-      setStatusText('Answer!');
-      await startAudioRecording();
-      setIsSubmitting(false);
-    } catch (error) {
-      console.error('Error in handleFinishQABlock:', error);
-    }
+          mediaRecorderRef.current.addEventListener('dataavailable', onDataAvailable);
+          mediaRecorderRef.current.addEventListener('stop', onStop);
+          
+          mediaRecorderRef.current.requestData();
+          mediaRecorderRef.current.stop();
+        });
+
+        console.log(startTime);
+        const audio_transcription = await sendAudioToServer(audioData);
+        const old_question = interviewTextRef.current;
+        const text_answer = answerTextRef.current;   
+        console.log("old_question: ", old_question)
+        console.log("text_answer: ", text_answer)
+        console.log("audio_transcription: ", audio_transcription)
+        const llm_answer = await sendQuestionToServer(old_question, text_answer, audio_transcription);
+        console.log("llm_answer: ", llm_answer)
+        let mark = llm_answer["mark"]
+        const validation_system_comment = llm_answer["comment"]
+        await sendUpdateLogsDBToServer(old_question, text_answer, audio_transcription, validation_system_comment, mark)
+        setStatusText('Answer!');
+        await startAudioRecording();
+        setIsSubmitting(false);
+      } catch (err) {
+        setIsSubmitting(false);
+        throw err;
+      } finally {
+        validationPromiseRef.current = null;
+      }
+    })();
+  
+    return validationPromiseRef.current;
   };
 
   const startAudioRecording = async () => {
@@ -366,13 +394,15 @@ const Simulation = () => {
                     current_key = current_key.trim();
                     if (cur[cur.length - 1] === ",")
                     cur = cur.slice(0, cur.length - 1);
-                    if (current_key === "Новый вопрос" && !new_question_doesnt_required) {
+                    if (current_key === "Новый вопрос" && !new_question_doesnt_required && isValidationEnded.current) {
                       localInterviewText += cur + " ";
                       setInterviewText(localInterviewText);
                     }
                     else if (current_key === "Комментарий проверяющей системы") {
                       localSystemComment += cur + " ";
-                      setStatusText('Time to think...');
+                      if (isValidationEnded.current) {
+                        setStatusText('Time to think...');
+                      }
                     }
                     else if (current_key === "Оценка") {
                       localRating = parseFloat(cur);
@@ -382,7 +412,9 @@ const Simulation = () => {
                         themesRef.current.themes = themesRef.current.themes.slice(1);
                         new_question_doesnt_required = true;
                         themeSessionDuration.current = 0;
-                        setStatusText('Time to think...');
+                        if (isValidationEnded.current) {
+                          setStatusText('Time to think...');
+                        }
                       }
                     }            
                 }
@@ -512,6 +544,27 @@ const Simulation = () => {
               muted
               className="video-stream"
             />
+            {isMicActive && (
+              <span
+                style={{
+                  position: 'absolute',
+                  right: '-10%',
+                  top: '25%',
+                  transform: 'translateY(-50%)',
+                  fontSize: 32,
+                  color: '#FF5252',
+                  background: 'rgba(0,0,0,0.1)',
+                  borderRadius: '50%',
+                  padding: 4
+                }}
+                title="Микрофон активен"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M10 14a3 3 0 0 0 3-3V5a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3zm5-6a1 1 0 1 1 2 0v3a7 7 0 0 1-14 0V8a1 1 0 1 1 2 0v3a5 5 0 0 0 10 0V8z"/>
+                  <rect width="2" height="5" x="9" y="15" rx="1"/>
+                </svg>
+              </span>
+            )}
           </div>
 
           <div ref={timerRef} className="time-display">

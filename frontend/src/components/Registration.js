@@ -9,6 +9,7 @@ const Register = () => {
   const [error, setError] = useState('');
   const { registerUser } = useContext(AuthContext);
   const navigate = useNavigate();
+  const [submitted, setSubmitted] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -23,9 +24,11 @@ const Register = () => {
       if (result.exists) {
         setError("You are already registered!")
       } else {
-        navigate('/login');
+        setSubmitted(true);
+        setTimeout(() => navigate('/login'), 3000);
       }
     } else {
+      setSubmitted(false);
       setError(
         typeof result.error === 'object' 
           ? Object.values(result.error).flat().join(' ') 
@@ -36,46 +39,53 @@ const Register = () => {
 
   return (
     <div id="login">
-      <div className="login-text">Регистрация</div>
-      {error && <p>{error}</p>}
-      <form onSubmit={handleSubmit}>
+      {submitted ? (
         <div>
-          <input
-            type="email"
-            className="input-field"
-            value={email}
-            placeholder='email'
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
+          <p className='small_text'>Сейчас придет на почту письмо о подтверждении</p>
+          <p className='small_text'>Вы будете перенаправлены на страницу входа через несколько секунд...</p>
         </div>
-        <div>
-          <input
-            type="password"
-            className="input-field"
-            value={password}
-            placeholder='password'
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-        </div>
-        <div>
-          <input
-            type="password"
-            className="input-field"
-            value={confirmPassword}
-            placeholder='confirm password'
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            required
-          />
-        </div>
-        <button type="submit" className="input-button">
-          Зарегистрироваться
+      ) : (
+        <form onSubmit={handleSubmit}>
+          <div className="login-text">Регистрация</div>
+          {error && <p>{error}</p>}
+          <div>
+            <input
+              type="email"
+              className="input-field"
+              value={email}
+              placeholder='email'
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
+          <div>
+            <input
+              type="password"
+              className="input-field"
+              value={password}
+              placeholder='password'
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+          <div>
+            <input
+              type="password"
+              className="input-field"
+              value={confirmPassword}
+              placeholder='confirm password'
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+            />
+          </div>
+          <button type="submit" className="input-button">
+            Зарегистрироваться
+          </button>
+        <button className="input-button" onClick={() => window.location.href = '/login'}>
+          Уже есть аккаунт
         </button>
-      </form>
-      <button className="input-button" onClick={() => window.location.href = '/login'}>
-        Уже есть аккаунт
-      </button>
+        </form>
+      )}
     </div>
   );
   

@@ -55,7 +55,6 @@ class RegisterView(APIView):
                     {"exists": False, "message": "Регистрация успешна. Проверьте email для подтверждения аккаунта."},
                     status=status.HTTP_201_CREATED
                 )
-                # return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
             except ValidationError as e:
                 return Response({'password': e.messages}, status=status.HTTP_400_BAD_REQUEST)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -165,7 +164,7 @@ class PasswordResetRequestView(APIView):
             
         except User.DoesNotExist:
             return Response(
-                {"message": "Письмо с восстановалением отправлено."},
+                {"message": "Инструкции по сбросу пароля отправлены на вашу почту."},
                 status=status.HTTP_200_OK
             )
 

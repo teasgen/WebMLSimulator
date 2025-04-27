@@ -30,10 +30,28 @@ function History() {
 
   
   const getMarkColor = (mark) => {
-    if (mark === 0) return '#FF3B30'; // Red for 0
-    if (mark >= 7) return '#A4B734';  // Green for 7+
-    return '#FFCC00';                 // Yellow for others
+    const m = Math.max(0, Math.min(10, mark));
+  
+    // КРАСНЫЙ -> ЖЕЛТЫЙ
+    if (m <= 5) {
+      // 0 = красный #FF3B30, 5 = желтый #FFCC00
+      // Интерполируем от (255,59,48) к (255,204,0)
+      const r = 255;
+      const g = Math.round(59 + (204-59) * (m/5));
+      const b = Math.round(48 + (0-48) * (m/5));
+      return `rgb(${r},${g},${b})`;
+    }
+  
+    // ЖЕЛТЫЙ -> ЗЕЛЕНЫЙ
+    // 5 = желтый #FFCC00, 10 = зелёный #A4B734
+    // от (255,204,0) к (164,183,52)
+    const ratio = (m-5)/5;
+    const r = Math.round(255 + (164-255)*ratio);
+    const g = Math.round(204 + (183-204)*ratio);
+    const b = Math.round(0 + (52-0)*ratio);
+    return `rgb(${r},${g},${b})`;
   };
+  
 
   const formatDate = (dateString) => {
     try {

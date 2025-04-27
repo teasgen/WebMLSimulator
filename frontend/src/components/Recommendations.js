@@ -36,6 +36,24 @@ function Recommendations() {
   const [chartData, setChartData] = useState({ labels: [], datasets: [] });
   const [error, setError] = useState(null);
 
+  const [filters, setFilters] = useState([]);
+  const [selectedFilter, setSelectedFilter] = useState('');
+
+  useEffect(() => {
+    const fetchFilters = async () => {
+      try {
+        const filtersList = await getStatsLogsDB({
+            "userID": user ? user.id : 0,
+            "task_name": "filters",
+        });
+        setFilters(filtersList || []);
+      } catch (err) {
+        setFilters([]);
+      }
+    };
+    fetchFilters();
+  }, []);
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -55,10 +73,12 @@ function Recommendations() {
         const topTopics = formattedTopics.slice(0, 5);
         
         setTopics(topTopics);
+        console.log(selectedFilter);
 
         const chartRawData = await getStatsLogsDB({
           "userID": user ? user.id : 0,
           "task_name": "graphic",
+          "filter_name": selectedFilter
         });
         chartRawData.sort((a, b) => new Date(a[1]) - new Date(b[1]));
         
@@ -92,10 +112,15 @@ function Recommendations() {
     };
 
     fetchData();
-  }, []);
+  }, [selectedFilter]);
 
   const handleBackClick = () => {
     console.log('Возврат в меню');
+  };
+
+  const handleFilterChange = (e) => {
+    const value = e.target.value;
+    setSelectedFilter(value);
   };
 
   const chartOptions = {
@@ -175,6 +200,22 @@ function Recommendations() {
       )}
       
       <h2 className="section-title">Изменение оценок</h2>
+      <div style={{ marginBottom: 12 }}>
+        <label>Фильтр по теме:&nbsp;</label>
+        <select
+          value={selectedFilter}
+          onChange={handleFilterChange}
+          disabled={filters.length === 0}
+          style={{ minWidth: 180 }}
+        >
+          <option value="">Выберите тему</option>
+          {filters.map((theme, idx) => (
+            <option key={idx} value={theme}>
+              {theme}
+            </option>
+          ))}
+        </select>
+      </div>
       {isLoading ? (
         <div className="loading">Загрузка графика...</div>
       ) : (
