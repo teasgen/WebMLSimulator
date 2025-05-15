@@ -1,11 +1,3 @@
-# Getting Started with Create React App
+### `PORT=3003 npm start`
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
-
-## Available Scripts
-
-In the project directory, you can run:
-
-### `npm start`
-
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+Open [http://localhost:3003](http://localhost:3003) to view it in your browser.

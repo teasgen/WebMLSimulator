@@ -11,3 +11,5 @@ There are 4 services:
 To run the app you must
 1. install GigaAM in GigaAM_fork directory via pip and set HF token
 2. download LLM as said in llm service readme 
+3. install conda environment using requirements.txt
+4. run all services according to the corresponding READMEs 
