@@ -215,7 +215,7 @@ class LogsDB(APIView):
             tasks = SimulationInstance.objects.filter(userID=user_id)
             return Response([{
                     "datetime": t.datetime.astimezone(ZoneInfo("Etc/GMT+3")),
-                    "mark": sum(sample["mark"] for sample in t.qa_blocks) / len(t.qa_blocks),
+                    "mark": round(sum(sample["mark"] for sample in t.qa_blocks) / len(t.qa_blocks), 2),
                 } for t in tasks if len(t.qa_blocks) > 0],
                 status=status.HTTP_200_OK,
             )
@@ -235,7 +235,7 @@ class StaticticsLogsDB(APIView):
             for simulation in simulations:
                 for block in simulation.qa_blocks:
                     themes[block["theme"]].append(block["mark"])
-            marks = [(sum(mark) / len(mark), theme) for theme, mark in themes.items()]
+            marks = [(round(sum(mark) / len(mark), 2), theme) for theme, mark in themes.items()]
             marks.sort(key=lambda tup: tup[0])
             print(marks)
             return Response(marks[:5], status=status.HTTP_200_OK)
